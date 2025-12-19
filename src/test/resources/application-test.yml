@@ -1,0 +1,57 @@
+# 测试环境配置 - 使用内存数据库，禁用需要外部服务的组件
+
+spring:
+  main:
+    lazy-initialization: true
+    allow-bean-definition-overriding: true
+
+  # 使用 H2 内存数据库替代 Postgres
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  # 禁用 Flyway（H2 不支持 pgvector）
+  flyway:
+    enabled: false
+
+  # 禁用 Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: none
+
+  # AI 模型配置 - 使用 mock
+  ai:
+    openai:
+      api-key: test-key
+      base-url: http://localhost:8081/v1
+    ollama:
+      enabled: false
+
+# 应用配置
+app:
+  model:
+    provider: openai
+    chat-model: gpt-4o-mini
+    embedding-model: text-embedding-3-small
+
+  agent:
+    max-steps: 3
+    duplicate-threshold: 2
+    empty-threshold: 2
+    system-prompt: "Test agent"
+
+  mcp:
+    namespace:
+      enabled: true
+      separator: "__"
+    servers: [ ]
+
+  rag:
+    enabled: false
+    top-k: 3
+    similarity-threshold: 0.7
