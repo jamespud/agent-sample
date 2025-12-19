@@ -60,6 +60,7 @@ app:
     max-steps: ${AGENT_MAX_STEPS:15}
     duplicate-threshold: ${AGENT_DUPLICATE_THRESHOLD:3}
     empty-threshold: ${AGENT_EMPTY_THRESHOLD:2}
+    degrade-prefix: ${AGENT_DEGRADE_PREFIX:未查到相关数据，以下为直接回答：}
     system-prompt: |
       You are an intelligent AI agent. You can use tools to help answer questions.
       When you have gathered enough information, provide your final answer.

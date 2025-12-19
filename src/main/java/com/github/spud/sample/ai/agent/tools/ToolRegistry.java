@@ -94,6 +94,38 @@ public class ToolRegistry {
   }
 
   /**
+   * 获取"无操作"工具回调（仅用于 THINK 阶段，让模型输出 toolCalls 但不执行）
+   * 这些回调的 call() 方法返回占位符，实际执行在 ACT 阶段使用真正的回调
+   */
+  public Collection<ToolCallback> getNoOpCallbacks() {
+    return definitionMap.entrySet().stream()
+        .map(entry -> new NoOpToolCallback(entry.getValue()))
+        .collect(java.util.stream.Collectors.toList());
+  }
+
+  /**
+   * 无操作工具回调包装器
+   */
+  private static class NoOpToolCallback implements ToolCallback {
+    private final ToolDefinition definition;
+
+    public NoOpToolCallback(ToolDefinition definition) {
+      this.definition = definition;
+    }
+
+    @Override
+    public ToolDefinition getToolDefinition() {
+      return definition;
+    }
+
+    @Override
+    public String call(String toolInput) {
+      // 占位返回，不执行实际逻辑
+      return "[PENDING_EXECUTION]";
+    }
+  }
+
+  /**
    * 检查工具是否存在
    */
   public boolean hasToolByName(String toolName) {

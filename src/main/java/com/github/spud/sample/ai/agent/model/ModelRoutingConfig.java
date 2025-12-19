@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 /**
- * 模型路由配置 基于配置选择使用 OpenAI 或 Ollama
+ * 模型路由配置 基于配置选择使用 OpenAI/Ark 或 Ollama
  */
 @Slf4j
 @Configuration
@@ -21,6 +21,18 @@ public class ModelRoutingConfig {
 
   @Value("${app.model.provider:openai}")
   private String modelProvider;
+
+  @Value("${spring.ai.openai.base-url:https://api.openai.com}")
+  private String openaiBaseUrl;
+
+  @Value("${spring.ai.openai.embedding.embeddings-path:/embeddings}")
+  private String embeddingsPath;
+
+  @Value("${spring.ai.openai.api-key:}")
+  private String apiKey;
+
+  @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}")
+  private String embeddingModelName;
 
   /**
    * 主 ChatClient - 基于配置的 provider 选择
@@ -69,11 +81,14 @@ public class ModelRoutingConfig {
   @Primary
   @Bean("agentEmbeddingModel")
   public EmbeddingModel getEmbeddingModel(
-    @Qualifier("openAiEmbeddingModel") EmbeddingModel openAiEmbeddingModel,
     @Qualifier("ollamaEmbeddingModel") EmbeddingModel ollamaEmbeddingModel) {
     if (modelProvider.equalsIgnoreCase("ollama")) {
+      log.info("Using Ollama embedding model");
       return ollamaEmbeddingModel;
     }
-    return openAiEmbeddingModel;
+    // 使用 Ark 多模态嵌入模型（兼容 OpenAI base-url）
+    log.info("Using Ark multimodal embedding model: baseUrl={}, path={}, model={}",
+        openaiBaseUrl, embeddingsPath, embeddingModelName);
+    return new ArkMultimodalEmbeddingModel(openaiBaseUrl, embeddingsPath, apiKey, embeddingModelName);
   }
 }

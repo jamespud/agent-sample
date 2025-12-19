@@ -27,6 +27,12 @@ import org.springframework.util.StringUtils;
 
 /**
  * Agent 核心编排器 驱动状态机，协调 think/act/terminate 循环
+ * 
+ * 关键设计：
+ * - THINK 阶段：使用 NoOp 工具回调，仅判定是否需要工具，不执行
+ * - ACT 阶段：使用真正的工具回调执行工具
+ * - 问题增强：THINK 前对用户问题进行释义/补充/结构化
+ * - RAG 降级：检索失败时注入提示，继续生成文本回答
  */
 @Slf4j
 @Component
@@ -38,6 +44,7 @@ public class AgentKernel {
   private final StateMachineDriver stateMachineDriver;
   private final TerminationPolicy terminationPolicy;
   private final McpToolSynchronizer mcpToolSynchronizer;
+  private final QuestionEnhancer questionEnhancer;
 
   @Value("${app.agent.system-prompt:You are an intelligent AI agent.}")
   private String systemPrompt;
@@ -54,15 +61,30 @@ public class AgentKernel {
   @Value("${app.agent.empty-threshold:2}")
   private int defaultEmptyThreshold;
 
+  @Value("${app.agent.degrade-prefix:未查到相关数据，以下为直接回答：}")
+  private String degradePrefix;
+
+  // THINK 阶段的工具使用约束提示
+  private static final String THINK_TOOL_CONSTRAINT = """
+      
+      【重要约束】
+      在此阶段，你可以查看可用工具并决定是否需要调用它们。
+      - 如果需要使用工具，请输出 tool_calls
+      - 如果不需要工具，请直接生成回答文本
+      - 当你完成任务后，请调用 terminate 工具并提供最终答案
+      """;
+
   public AgentKernel(ChatClient chatClient, ToolRegistry toolRegistry,
     ToolExecutionService toolExecutionService, StateMachineDriver stateMachineDriver,
-    TerminationPolicy terminationPolicy, McpToolSynchronizer mcpToolSynchronizer) {
+    TerminationPolicy terminationPolicy, McpToolSynchronizer mcpToolSynchronizer,
+    QuestionEnhancer questionEnhancer) {
     this.chatClient = chatClient;
     this.toolRegistry = toolRegistry;
     this.toolExecutionService = toolExecutionService;
     this.stateMachineDriver = stateMachineDriver;
     this.terminationPolicy = terminationPolicy;
     this.mcpToolSynchronizer = mcpToolSynchronizer;
+    this.questionEnhancer = questionEnhancer;
   }
 
   /**
@@ -89,12 +111,22 @@ public class AgentKernel {
 
     // 初始化消息历史
     List<Message> messages = new ArrayList<>();
-    messages.add(new SystemMessage(systemPrompt));
-    messages.add(new UserMessage(ctx.getUserRequest()));
+    messages.add(new SystemMessage(systemPrompt + THINK_TOOL_CONSTRAINT));
 
     try {
       // 同步 MCP 工具
       mcpToolSynchronizer.synchronizeAll();
+
+      // 问题增强
+      QuestionEnhancer.EnhancementResult enhancement = questionEnhancer.enhance(chatClient, ctx.getUserRequest());
+      ctx.setEnhancedQuery(enhancement.getSearchQuery());
+      ctx.setEnhancementSummary(questionEnhancer.toSummaryMessage(enhancement));
+      log.debug("Question enhanced: original='{}', rephrased='{}'", 
+          ctx.getUserRequest(), enhancement.getRephrased());
+
+      // 将增强摘要加入消息历史
+      messages.add(new SystemMessage(ctx.getEnhancementSummary()));
+      messages.add(new UserMessage(ctx.getUserRequest()));
 
       // 启动状态机
       stateMachineDriver.sendEvent(sm, AgentEvent.START, ctx);
@@ -125,8 +157,14 @@ public class AgentKernel {
       ctx.setEndTime(Instant.now());
       ctx.setCurrentState(stateMachineDriver.getCurrentState(sm));
 
+      // 处理最终答案
       if (ctx.getFinalAnswer() == null && ctx.getLastAssistantContent() != null) {
-        ctx.setFinalAnswer(ctx.getLastAssistantContent());
+        // 如果 RAG 无数据，添加降级前缀
+        if (ctx.isRagNoData()) {
+          ctx.setFinalAnswer(degradePrefix + ctx.getLastAssistantContent());
+        } else {
+          ctx.setFinalAnswer(ctx.getLastAssistantContent());
+        }
       }
 
       if (ctx.getTerminationReason() == null) {
@@ -147,6 +185,7 @@ public class AgentKernel {
 
   /**
    * 执行思考阶段
+   * 使用 NoOp 工具回调，仅判定是否需要工具，不执行
    */
   private void executeThink(AgentContext ctx, StateMachine<AgentState, AgentEvent> sm,
     List<Message> messages) {
@@ -161,13 +200,13 @@ public class AgentKernel {
       .timestamp(Instant.now());
 
     try {
-      // 构建 prompt，包含可用工具
-      List<ToolCallback> tools = new ArrayList<>(toolRegistry.getAllCallbacks());
+      // 使用 NoOp 回调，让模型输出 toolCalls 但不执行
+      List<ToolCallback> noOpTools = new ArrayList<>(toolRegistry.getNoOpCallbacks());
       Prompt prompt = new Prompt(messages);
 
-      // 调用 LLM
+      // 调用 LLM（工具不会被执行，仅返回 toolCalls 决策）
       ChatResponse response = chatClient.prompt(prompt)
-        .toolCallbacks(tools.toArray(new ToolCallback[0]))
+        .toolCallbacks(noOpTools.toArray(new ToolCallback[0]))
         .call()
         .chatResponse();
 
@@ -176,10 +215,11 @@ public class AgentKernel {
 
       // 记录响应
       String content = assistantMessage.getText();
+      ctx.setLastAssistantContent(content);
       List<AssistantMessage.ToolCall> toolCalls = assistantMessage.getToolCalls();
 
       List<StepRecord.ToolCallRecord> toolCallRecords = null;
-      if (!toolCalls.isEmpty()) {
+      if (toolCalls != null && !toolCalls.isEmpty()) {
         toolCallRecords = toolCalls.stream()
           .map(tc -> StepRecord.ToolCallRecord.builder()
             .id(tc.id())
@@ -199,14 +239,24 @@ public class AgentKernel {
       ctx.addStepRecord(stepBuilder.build());
 
       // 决定下一步
-      if (!toolCalls.isEmpty()) {
+      if (toolCalls != null && !toolCalls.isEmpty()) {
+        // 有工具调用，进入 ACT 阶段执行
         stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_WITH_TOOLS, ctx);
       } else {
-        // 无工具调用，检查是否有内容
-        if (!StringUtils.hasText(content)) {
+        // 无工具调用
+        if (StringUtils.hasText(content)) {
+          // 有文本内容，设为最终答案
           ctx.setFinalAnswer(content);
+          stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_NO_TOOLS, ctx);
+        } else {
+          // 文本为空，注入降级提示并继续思考
+          if (ctx.isRagNoData()) {
+            messages.add(new SystemMessage(
+                "【提示】未查到相关数据，请直接根据已有上下文与常识作答。请在回答前加前缀：'" + degradePrefix + "'"));
+          }
+          // 不发送事件，继续下一轮 THINK（由终止策略控制最大重试）
+          log.debug("Empty response, will retry THINK phase");
         }
-        stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_NO_TOOLS, ctx);
       }
 
     } catch (Exception e) {
@@ -220,6 +270,7 @@ public class AgentKernel {
 
   /**
    * 执行行动阶段
+   * 使用真正的工具回调执行工具，检测 RAG 失败并设置降级标志
    */
   private void executeAct(AgentContext ctx, StateMachine<AgentState, AgentEvent> sm,
     List<Message> messages) {
@@ -242,7 +293,7 @@ public class AgentKernel {
       }
 
       List<AssistantMessage.ToolCall> toolCalls = assistantMessage.getToolCalls();
-      if (toolCalls.isEmpty()) {
+      if (toolCalls == null || toolCalls.isEmpty()) {
         stateMachineDriver.sendEvent(sm, AgentEvent.ACT_DONE, ctx);
         return;
       }
@@ -257,7 +308,7 @@ public class AgentKernel {
 
         log.debug("Executing tool: {} with args: {}", toolName, truncate(arguments, 100));
 
-        // 执行工具
+        // 使用真正的工具回调执行
         ToolExecutionService.ToolExecutionResult result = toolExecutionService.execute(toolName,
           arguments);
 
@@ -266,11 +317,26 @@ public class AgentKernel {
           toolCall.id(), result);
         resultRecords.add(resultRecord);
 
+        String toolResult = result.getResult() != null ? result.getResult() : "";
+
+        // 检测 RAG 检索结果
+        if ("retrieve_knowledge".equals(toolName)) {
+          if (toolResult.contains("Error retrieving knowledge:") 
+              || toolResult.equals("No relevant documents found.")
+              || toolResult.isBlank()) {
+            log.info("RAG returned no data, setting degrade flag");
+            ctx.setRagNoData(true);
+            // 注入降级提示到消息历史
+            messages.add(new SystemMessage(
+                "【提示】知识库检索未返回结果。请直接根据已有上下文与常识回答用户问题。在回答前加前缀：'" + degradePrefix + "'"));
+          }
+        }
+
         // 构建响应
         toolResponses.add(new ToolResponseMessage.ToolResponse(
           toolCall.id(),
           toolName,
-          result.getResult() != null ? result.getResult() : ""
+          toolResult
         ));
 
         // 检查是否是 terminate 工具
@@ -282,8 +348,16 @@ public class AgentKernel {
             answer = answer.substring("TERMINATE:".length());
             try {
               var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(answer);
-              ctx.setFinalAnswer(node.path("answer").asText());
+              String finalAnswer = node.path("answer").asText();
+              // 如果 RAG 无数据，添加降级前缀
+              if (ctx.isRagNoData() && !finalAnswer.startsWith(degradePrefix)) {
+                finalAnswer = degradePrefix + finalAnswer;
+              }
+              ctx.setFinalAnswer(finalAnswer);
             } catch (Exception e) {
+              if (ctx.isRagNoData() && !answer.startsWith(degradePrefix)) {
+                answer = degradePrefix + answer;
+              }
               ctx.setFinalAnswer(answer);
             }
           }
@@ -302,6 +376,7 @@ public class AgentKernel {
       if (terminateTriggered) {
         stateMachineDriver.sendEvent(sm, AgentEvent.TOOL_TERMINATE, ctx);
       } else {
+        // 回到 THINK 继续处理
         stateMachineDriver.sendEvent(sm, AgentEvent.ACT_DONE, ctx);
       }
 

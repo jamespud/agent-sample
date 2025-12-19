@@ -99,6 +99,22 @@ public class AgentContext {
   private boolean ragEnabled = true;
 
   /**
+   * RAG 无数据标志（用于降级处理）
+   */
+  @Builder.Default
+  private boolean ragNoData = false;
+
+  /**
+   * 增强后的查询（用于 RAG 检索）
+   */
+  private String enhancedQuery;
+
+  /**
+   * 问题增强结果摘要
+   */
+  private String enhancementSummary;
+
+  /**
    * 启用的 MCP server ID 列表
    */
   @Builder.Default
