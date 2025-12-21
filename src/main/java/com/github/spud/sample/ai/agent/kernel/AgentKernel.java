@@ -1,49 +1,45 @@
 package com.github.spud.sample.ai.agent.kernel;
 
-import com.github.spud.sample.ai.agent.mcp.McpToolSynchronizer;
+import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonAction;
+import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonParseException;
+import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonParser;
+import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonStep;
 import com.github.spud.sample.ai.agent.state.AgentEvent;
 import com.github.spud.sample.ai.agent.state.AgentState;
 import com.github.spud.sample.ai.agent.state.StateMachineDriver;
 import com.github.spud.sample.ai.agent.tools.ToolExecutionService;
-import com.github.spud.sample.ai.agent.tools.ToolRegistry;
+import com.github.spud.sample.ai.agent.tools.ToolFilteringService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 /**
  * Agent 核心编排器 驱动状态机，协调 think/act/terminate 循环
- * 
- * 关键设计：
- * - THINK 阶段：使用 NoOp 工具回调，仅判定是否需要工具，不执行
- * - ACT 阶段：使用真正的工具回调执行工具
- * - 问题增强：THINK 前对用户问题进行释义/补充/结构化
- * - RAG 降级：检索失败时注入提示，继续生成文本回答
+ * <p>
+ * 关键设计：<p> - THINK 阶段：使用 NoOp 工具回调，仅判定是否需要工具，不执行<p> - ACT 阶段：使用真正的工具回调执行工具<p> - 问题增强：THINK
+ * 前对用户问题进行释义/补充/结构化<p> - RAG 降级：检索失败时注入提示，继续生成文本回答<p>
  */
 @Slf4j
 @Component
 public class AgentKernel {
 
   private final ChatClient chatClient;
-  private final ToolRegistry toolRegistry;
+  private final ToolFilteringService toolFilteringService;
   private final ToolExecutionService toolExecutionService;
   private final StateMachineDriver stateMachineDriver;
   private final TerminationPolicy terminationPolicy;
-  private final McpToolSynchronizer mcpToolSynchronizer;
+  private final ReactJsonParser reactJsonParser;
   private final QuestionEnhancer questionEnhancer;
 
   @Value("${app.agent.system-prompt:You are an intelligent AI agent.}")
@@ -66,24 +62,24 @@ public class AgentKernel {
 
   // THINK 阶段的工具使用约束提示
   private static final String THINK_TOOL_CONSTRAINT = """
-      
-      【重要约束】
-      在此阶段，你可以查看可用工具并决定是否需要调用它们。
-      - 如果需要使用工具，请输出 tool_calls
-      - 如果不需要工具，请直接生成回答文本
-      - 当你完成任务后，请调用 terminate 工具并提供最终答案
-      """;
+    
+    【重要约束】
+    在此阶段，你可以查看可用工具并决定是否需要调用它们。
+    - 如果需要使用工具，请输出 tool_calls
+    - 如果不需要工具，请直接生成回答文本
+    - 当你完成任务后，请调用 terminate 工具并提供最终答案
+    """;
 
-  public AgentKernel(ChatClient chatClient, ToolRegistry toolRegistry,
+  public AgentKernel(ChatClient chatClient, ToolFilteringService toolFilteringService,
     ToolExecutionService toolExecutionService, StateMachineDriver stateMachineDriver,
-    TerminationPolicy terminationPolicy, McpToolSynchronizer mcpToolSynchronizer,
+    TerminationPolicy terminationPolicy, ReactJsonParser reactJsonParser,
     QuestionEnhancer questionEnhancer) {
     this.chatClient = chatClient;
-    this.toolRegistry = toolRegistry;
+    this.toolFilteringService = toolFilteringService;
     this.toolExecutionService = toolExecutionService;
     this.stateMachineDriver = stateMachineDriver;
     this.terminationPolicy = terminationPolicy;
-    this.mcpToolSynchronizer = mcpToolSynchronizer;
+    this.reactJsonParser = reactJsonParser;
     this.questionEnhancer = questionEnhancer;
   }
 
@@ -111,18 +107,20 @@ public class AgentKernel {
 
     // 初始化消息历史
     List<Message> messages = new ArrayList<>();
-    messages.add(new SystemMessage(systemPrompt + THINK_TOOL_CONSTRAINT));
+    messages.add(new SystemMessage(systemPrompt));
 
     try {
-      // 同步 MCP 工具
-      mcpToolSynchronizer.synchronizeAll();
+      // 注入工具目录与 ReAct JSON 协议提示（按请求过滤可用工具）
+      String toolCatalogPrompt = toolFilteringService.buildToolCatalogPrompt(ctx);
+      messages.add(new SystemMessage(toolCatalogPrompt));
 
       // 问题增强
-      QuestionEnhancer.EnhancementResult enhancement = questionEnhancer.enhance(chatClient, ctx.getUserRequest());
+      QuestionEnhancer.EnhancementResult enhancement = questionEnhancer.enhance(chatClient,
+        ctx.getUserRequest());
       ctx.setEnhancedQuery(enhancement.getSearchQuery());
       ctx.setEnhancementSummary(questionEnhancer.toSummaryMessage(enhancement));
-      log.debug("Question enhanced: original='{}', rephrased='{}'", 
-          ctx.getUserRequest(), enhancement.getRephrased());
+      log.debug("Question enhanced: original='{}', rephrased='{}'",
+        ctx.getUserRequest(), enhancement.getRephrased());
 
       // 将增强摘要加入消息历史
       messages.add(new SystemMessage(ctx.getEnhancementSummary()));
@@ -184,8 +182,7 @@ public class AgentKernel {
   }
 
   /**
-   * 执行思考阶段
-   * 使用 NoOp 工具回调，仅判定是否需要工具，不执行
+   * 执行思考阶段 使用 ReactJsonParser 解析模型输出的 JSON action
    */
   private void executeThink(AgentContext ctx, StateMachine<AgentState, AgentEvent> sm,
     List<Message> messages) {
@@ -200,63 +197,139 @@ public class AgentKernel {
       .timestamp(Instant.now());
 
     try {
-      // 使用 NoOp 回调，让模型输出 toolCalls 但不执行
-      List<ToolCallback> noOpTools = new ArrayList<>(toolRegistry.getNoOpCallbacks());
+      // 调用 LLM
       Prompt prompt = new Prompt(messages);
-
-      // 调用 LLM（工具不会被执行，仅返回 toolCalls 决策）
       ChatResponse response = chatClient.prompt(prompt)
-        .toolCallbacks(noOpTools.toArray(new ToolCallback[0]))
         .call()
         .chatResponse();
 
       AssistantMessage assistantMessage = response.getResult().getOutput();
+      String modelText = assistantMessage.getText();
       messages.add(assistantMessage);
 
-      // 记录响应
-      String content = assistantMessage.getText();
-      ctx.setLastAssistantContent(content);
-      List<AssistantMessage.ToolCall> toolCalls = assistantMessage.getToolCalls();
+      log.debug("Model response text: {}", truncate(modelText, 300));
 
-      List<StepRecord.ToolCallRecord> toolCallRecords = null;
-      if (toolCalls != null && !toolCalls.isEmpty()) {
-        toolCallRecords = toolCalls.stream()
-          .map(tc -> StepRecord.ToolCallRecord.builder()
-            .id(tc.id())
-            .name(tc.name())
-            .arguments(tc.arguments())
-            .build())
-          .collect(Collectors.toList());
+      // 解析 ReAct JSON
+      ReactJsonStep step;
+      try {
+        step = reactJsonParser.parse(modelText);
+      } catch (ReactJsonParseException e) {
+        log.warn("Failed to parse ReAct JSON: {} - Original text: {}",
+          e.getReason(), truncate(e.getOriginalText(), 200));
+
+        // 注入纠错提示
+        String correctionPrompt = String.format(
+          "【解析错误】你上一轮的输出无法解析为合法的 ReAct JSON。错误原因：%s\\n\\n" +
+            "请严格按照以下格式重新输出（只输出 JSON，不要有其他文字）：\\n" +
+            "{\\n" +
+            "  \\\"thought\\\": \\\"你的思考过程（≤200字）\\\",\\n" +
+            "  \\\"action\\\": {\\\"type\\\":\\\"tool|final|none\\\", ...}\\n" +
+            "}",
+          e.getReason()
+        );
+        messages.add(new SystemMessage(correctionPrompt));
+
+        stepBuilder.promptSummary("Parse error: " + e.getReason())
+          .error(e.getMessage())
+          .durationMs(System.currentTimeMillis() - startTime);
+        ctx.addStepRecord(stepBuilder.build());
+
+        // 不发送状态机事件，交由终止策略控制重试
+        terminationPolicy.recordEmptyResponse(ctx);
+        return;
       }
 
-      // 更新终止策略计数
-      terminationPolicy.recordResponse(ctx, content, toolCallRecords);
+      // 记录 thought
+      ctx.setLastThought(step.getThought());
+      ctx.setLastAssistantContent(modelText);
 
-      stepBuilder.promptSummary(truncate(content, 200))
-        .toolCalls(toolCallRecords)
-        .durationMs(System.currentTimeMillis() - startTime);
+      ReactJsonAction action = step.getAction();
+      String actionType = action.getType().toLowerCase();
 
-      ctx.addStepRecord(stepBuilder.build());
+      log.debug("Parsed action type: {}", actionType);
 
-      // 决定下一步
-      if (toolCalls != null && !toolCalls.isEmpty()) {
-        // 有工具调用，进入 ACT 阶段执行
-        stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_WITH_TOOLS, ctx);
-      } else {
-        // 无工具调用
-        if (StringUtils.hasText(content)) {
-          // 有文本内容，设为最终答案
-          ctx.setFinalAnswer(content);
-          stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_NO_TOOLS, ctx);
-        } else {
-          // 文本为空，注入降级提示并继续思考
-          if (ctx.isRagNoData()) {
-            messages.add(new SystemMessage(
-                "【提示】未查到相关数据，请直接根据已有上下文与常识作答。请在回答前加前缀：'" + degradePrefix + "'"));
+      switch (actionType) {
+        case "tool":
+          // 工具调用：暂存到 ctx，进入 ACT 阶段
+          ctx.setPendingToolName(action.getName());
+          try {
+            ctx.setPendingToolArgs(
+              new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(action.getArgs())
+            );
+          } catch (Exception e) {
+            log.error("Failed to serialize tool args: {}", e.getMessage(), e);
+            ctx.setPendingToolArgs("{}");
           }
-          // 不发送事件，继续下一轮 THINK（由终止策略控制最大重试）
-          log.debug("Empty response, will retry THINK phase");
-        }
+
+          // 记录工具调用到 StepRecord
+          List<StepRecord.ToolCallRecord> toolCallRecords = List.of(
+            StepRecord.ToolCallRecord.builder()
+              .id("step-" + ctx.getStepCounter())
+              .name(action.getName())
+              .arguments(ctx.getPendingToolArgs())
+              .build()
+          );
+
+          stepBuilder.promptSummary(truncate(step.getThought(), 200))
+            .toolCalls(toolCallRecords)
+            .durationMs(System.currentTimeMillis() - startTime);
+          ctx.addStepRecord(stepBuilder.build());
+
+          // 更新终止策略计数
+          terminationPolicy.recordResponse(ctx, modelText, toolCallRecords);
+
+          // 进入 ACT 阶段
+          stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_WITH_TOOLS, ctx);
+          break;
+
+        case "final":
+          // 最终答案
+          String finalAnswer = action.getAnswer();
+
+          // 处理 RAG 降级前缀
+          if (ctx.isRagNoData() && !finalAnswer.startsWith(degradePrefix)) {
+            finalAnswer = degradePrefix + finalAnswer;
+          }
+
+          ctx.setFinalAnswer(finalAnswer);
+          ctx.setTerminationReason(AgentContext.TerminationReason.COMPLETED);
+
+          stepBuilder.promptSummary(truncate(step.getThought(), 200))
+            .durationMs(System.currentTimeMillis() - startTime);
+          ctx.addStepRecord(stepBuilder.build());
+
+          terminationPolicy.recordResponse(ctx, modelText, null);
+
+          // 完成
+          stateMachineDriver.sendEvent(sm, AgentEvent.THINK_DONE_NO_TOOLS, ctx);
+          break;
+
+        case "none":
+          // 无动作：注入提示要求选择 tool 或 final
+          log.debug("Action type is 'none', injecting correction prompt");
+          String nonePrompt =
+            "【提示】你上一轮选择了 action.type=none，但你必须采取行动。\\n" +
+              "请重新思考并选择：\\n" +
+              "- 如果需要工具帮助，使用 {\\\"type\\\":\\\"tool\\\", \\\"name\\\":\\\"...\\\", \\\"args\\\":{...}}\\n"
+              +
+              "- 如果可以直接回答，使用 {\\\"type\\\":\\\"final\\\", \\\"answer\\\":\\\"...\\\"}";
+          messages.add(new SystemMessage(nonePrompt));
+
+          stepBuilder.promptSummary(truncate(step.getThought(), 200))
+            .durationMs(System.currentTimeMillis() - startTime);
+          ctx.addStepRecord(stepBuilder.build());
+
+          terminationPolicy.recordEmptyResponse(ctx);
+          // 不发送事件，交由终止策略控制
+          break;
+
+        default:
+          log.warn("Unknown action type: {}", actionType);
+          stepBuilder.error("Unknown action type: " + actionType)
+            .durationMs(System.currentTimeMillis() - startTime);
+          ctx.addStepRecord(stepBuilder.build());
+          terminationPolicy.recordEmptyResponse(ctx);
+          break;
       }
 
     } catch (Exception e) {
@@ -269,8 +342,7 @@ public class AgentKernel {
   }
 
   /**
-   * 执行行动阶段
-   * 使用真正的工具回调执行工具，检测 RAG 失败并设置降级标志
+   * 执行行动阶段 读取挂起工具执行并注入 Observation JSON
    */
   private void executeAct(AgentContext ctx, StateMachine<AgentState, AgentEvent> sm,
     List<Message> messages) {
@@ -284,107 +356,94 @@ public class AgentKernel {
       .timestamp(Instant.now());
 
     try {
-      // 获取最后一条 assistant 消息的工具调用
-      Message lastMessage = messages.get(messages.size() - 1);
-      if (!(lastMessage instanceof AssistantMessage assistantMessage)) {
-        log.warn("Expected AssistantMessage but got: {}", lastMessage.getClass());
+      String toolName = ctx.getPendingToolName();
+      String toolArgs = ctx.getPendingToolArgs();
+
+      if (toolName == null || toolName.isBlank()) {
+        log.warn("No pending tool to execute in ACT phase");
         stateMachineDriver.sendEvent(sm, AgentEvent.ACT_DONE, ctx);
         return;
       }
 
-      List<AssistantMessage.ToolCall> toolCalls = assistantMessage.getToolCalls();
-      if (toolCalls == null || toolCalls.isEmpty()) {
-        stateMachineDriver.sendEvent(sm, AgentEvent.ACT_DONE, ctx);
-        return;
+      log.debug("Executing tool: {} with args: {}", toolName, truncate(toolArgs, 100));
+
+      // 执行工具
+      ToolExecutionService.ToolExecutionResult result =
+        toolExecutionService.execute(toolName, toolArgs);
+
+      // 构建 Observation JSON
+      String observationJson;
+      try {
+        com.fasterxml.jackson.databind.ObjectMapper mapper =
+          new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.node.ObjectNode obsNode = mapper.createObjectNode();
+        com.fasterxml.jackson.databind.node.ObjectNode dataNode = obsNode.putObject("observation");
+        dataNode.put("tool", toolName);
+        dataNode.put("ok", result.isSuccess());
+
+        if (result.isSuccess()) {
+          dataNode.put("result", result.getResult() != null ? result.getResult() : "");
+        } else {
+          dataNode.put("error", result.getError() != null ? result.getError() : "Unknown error");
+        }
+
+        observationJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obsNode);
+      } catch (Exception e) {
+        log.error("Failed to build observation JSON: {}", e.getMessage(), e);
+        observationJson = String.format(
+          "{\"observation\":{\"tool\":\"%s\",\"ok\":false,\"error\":\"Failed to format observation\"}}",
+          toolName
+        );
       }
 
-      List<StepRecord.ToolResultRecord> resultRecords = new ArrayList<>();
-      List<ToolResponseMessage.ToolResponse> toolResponses = new ArrayList<>();
-      boolean terminateTriggered = false;
+      // 注入 Observation 到消息历史
+      messages.add(new SystemMessage(observationJson));
+      log.debug("Injected observation JSON: {}", truncate(observationJson, 300));
 
-      for (AssistantMessage.ToolCall toolCall : toolCalls) {
-        String toolName = toolCall.name();
-        String arguments = toolCall.arguments();
-
-        log.debug("Executing tool: {} with args: {}", toolName, truncate(arguments, 100));
-
-        // 使用真正的工具回调执行
-        ToolExecutionService.ToolExecutionResult result = toolExecutionService.execute(toolName,
-          arguments);
-
-        // 记录结果
-        StepRecord.ToolResultRecord resultRecord = toolExecutionService.toResultRecord(
-          toolCall.id(), result);
-        resultRecords.add(resultRecord);
-
+      // 检测 RAG 无数据
+      if ("retrieve_knowledge".equals(toolName)) {
         String toolResult = result.getResult() != null ? result.getResult() : "";
+        if (toolResult.contains("Error retrieving knowledge:")
+          || toolResult.equals("No relevant documents found.")
+          || toolResult.isBlank()) {
+          log.info("RAG returned no data, setting degrade flag");
+          ctx.setRagNoData(true);
 
-        // 检测 RAG 检索结果
-        if ("retrieve_knowledge".equals(toolName)) {
-          if (toolResult.contains("Error retrieving knowledge:") 
-              || toolResult.equals("No relevant documents found.")
-              || toolResult.isBlank()) {
-            log.info("RAG returned no data, setting degrade flag");
-            ctx.setRagNoData(true);
-            // 注入降级提示到消息历史
-            messages.add(new SystemMessage(
-                "【提示】知识库检索未返回结果。请直接根据已有上下文与常识回答用户问题。在回答前加前缀：'" + degradePrefix + "'"));
-          }
-        }
-
-        // 构建响应
-        toolResponses.add(new ToolResponseMessage.ToolResponse(
-          toolCall.id(),
-          toolName,
-          toolResult
-        ));
-
-        // 检查是否是 terminate 工具
-        if ("terminate".equals(toolName)) {
-          terminateTriggered = true;
-          // 解析最终答案
-          String answer = result.getResult();
-          if (answer != null && answer.startsWith("TERMINATE:")) {
-            answer = answer.substring("TERMINATE:".length());
-            try {
-              var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(answer);
-              String finalAnswer = node.path("answer").asText();
-              // 如果 RAG 无数据，添加降级前缀
-              if (ctx.isRagNoData() && !finalAnswer.startsWith(degradePrefix)) {
-                finalAnswer = degradePrefix + finalAnswer;
-              }
-              ctx.setFinalAnswer(finalAnswer);
-            } catch (Exception e) {
-              if (ctx.isRagNoData() && !answer.startsWith(degradePrefix)) {
-                answer = degradePrefix + answer;
-              }
-              ctx.setFinalAnswer(answer);
-            }
-          }
-          ctx.setTerminationReason(AgentContext.TerminationReason.TOOL_TERMINATE);
+          // 注入降级提示
+          messages.add(new SystemMessage(
+            "【提示】知识库检索未返回结果。请直接根据已有上下文与常识回答用户问题。" +
+              "在最终答案前加前缀：'" + degradePrefix + "'"
+          ));
         }
       }
 
-      // 添加工具响应到消息历史
-      messages.add(new ToolResponseMessage(toolResponses));
+      // 记录工具结果
+      StepRecord.ToolResultRecord resultRecord = toolExecutionService.toResultRecord(
+        "step-" + (ctx.getStepCounter() - 1), // 对应上一个 THINK step
+        result
+      );
 
-      stepBuilder.toolResults(resultRecords)
+      stepBuilder.toolResults(List.of(resultRecord))
         .durationMs(System.currentTimeMillis() - startTime);
       ctx.addStepRecord(stepBuilder.build());
 
-      // 决定下一步
-      if (terminateTriggered) {
-        stateMachineDriver.sendEvent(sm, AgentEvent.TOOL_TERMINATE, ctx);
-      } else {
-        // 回到 THINK 继续处理
-        stateMachineDriver.sendEvent(sm, AgentEvent.ACT_DONE, ctx);
-      }
+      // 清空挂起动作
+      ctx.setPendingToolName(null);
+      ctx.setPendingToolArgs(null);
+
+      // 回到 THINK 继续处理
+      stateMachineDriver.sendEvent(sm, AgentEvent.ACT_DONE, ctx);
 
     } catch (Exception e) {
       log.error("Act phase failed: {}", e.getMessage(), e);
       stepBuilder.error(e.getMessage())
         .durationMs(System.currentTimeMillis() - startTime);
       ctx.addStepRecord(stepBuilder.build());
+
+      // 清空挂起动作
+      ctx.setPendingToolName(null);
+      ctx.setPendingToolArgs(null);
+
       stateMachineDriver.sendEvent(sm, AgentEvent.FAIL, ctx);
     }
   }

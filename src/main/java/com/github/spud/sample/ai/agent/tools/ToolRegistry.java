@@ -94,19 +94,19 @@ public class ToolRegistry {
   }
 
   /**
-   * 获取"无操作"工具回调（仅用于 THINK 阶段，让模型输出 toolCalls 但不执行）
-   * 这些回调的 call() 方法返回占位符，实际执行在 ACT 阶段使用真正的回调
+   * 获取"无操作"工具回调（仅用于 THINK 阶段，让模型输出 toolCalls 但不执行） 这些回调的 call() 方法返回占位符，实际执行在 ACT 阶段使用真正的回调
    */
   public Collection<ToolCallback> getNoOpCallbacks() {
     return definitionMap.entrySet().stream()
-        .map(entry -> new NoOpToolCallback(entry.getValue()))
-        .collect(java.util.stream.Collectors.toList());
+      .map(entry -> new NoOpToolCallback(entry.getValue()))
+      .collect(java.util.stream.Collectors.toList());
   }
 
   /**
    * 无操作工具回调包装器
    */
   private static class NoOpToolCallback implements ToolCallback {
+
     private final ToolDefinition definition;
 
     public NoOpToolCallback(ToolDefinition definition) {
@@ -146,5 +146,34 @@ public class ToolRegistry {
     log.warn("Clearing all tools from registry");
     callbackMap.clear();
     definitionMap.clear();
+  }
+
+  /**
+   * 构建 THINK 阶段工具 Schema 提示 汇总所有工具定义为文本形式，供 THINK 阶段注入系统消息
+   */
+  public String buildThinkToolSchemaPrompt() {
+    if (definitionMap.isEmpty()) {
+      return "【可用工具清单】\n当前没有可用工具。";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("【可用工具清单】\n");
+    sb.append("以下工具可在后续 ACT 阶段执行，THINK 阶段仅用于决策是否需要工具及其参数。\n\n");
+
+    int index = 1;
+    for (ToolDefinition def : definitionMap.values()) {
+      sb.append(index++).append(". 工具名: ").append(def.name()).append("\n");
+      sb.append("   描述: ").append(def.description() != null ? def.description() : "无描述")
+        .append("\n");
+      sb.append("   输入Schema: ").append(def.inputSchema() != null ? def.inputSchema() : "{}")
+        .append("\n\n");
+    }
+
+    sb.append("【输出要求】\n");
+    sb.append("- 如果需要使用工具，请在响应中包含 tool_calls，指定工具名和参数\n");
+    sb.append("- 如果不需要工具，请直接生成文本回答\n");
+    sb.append("- 工具的实际执行将在 ACT 阶段进行，THINK 阶段仅做决策\n");
+
+    return sb.toString();
   }
 }

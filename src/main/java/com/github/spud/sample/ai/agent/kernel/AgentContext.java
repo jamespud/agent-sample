@@ -121,6 +121,21 @@ public class AgentContext {
   private List<String> enabledMcpServers = new ArrayList<>();
 
   /**
+   * 挂起的工具调用名称（THINK 阶段解析出 action.type=tool 后暂存，ACT 阶段执行）
+   */
+  private String pendingToolName;
+
+  /**
+   * 挂起的工具调用参数（JSON 字符串）
+   */
+  private String pendingToolArgs;
+
+  /**
+   * 最后一轮思考内容（用于 trace，可选）
+   */
+  private String lastThought;
+
+  /**
    * 最终回答
    */
   private String finalAnswer;

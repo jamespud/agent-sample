@@ -29,6 +29,10 @@ spring:
         index-type: hnsw
         distance-type: cosine_distance
         dimensions: 1536
+    mcp:
+      client:
+        stdio:
+          servers-configuration: classpath:mcp-servers-config.json
 
   # ====================== Data Sources ======================
   datasource:
@@ -70,16 +74,16 @@ app:
 
   mcp:
     servers:
-      - id: default
-        enabled: ${MCP_DEFAULT_ENABLED:false}
-        transport: ${MCP_DEFAULT_TRANSPORT:sse}
-        sse:
-          url: ${MCP_DEFAULT_SSE_URL:http://localhost:8000/sse}
-        stdio:
-          command: ${MCP_DEFAULT_STDIO_CMD:}
-          args: ${MCP_DEFAULT_STDIO_ARGS:}
-        refresh:
-          every-steps: 5
+#      - id: default
+#        enabled: ${MCP_DEFAULT_ENABLED:false}
+#        transport: ${MCP_DEFAULT_TRANSPORT:sse}
+#        sse:
+#          url: ${MCP_DEFAULT_SSE_URL:http://localhost:8000/sse}
+#        stdio:
+#          command: ${MCP_DEFAULT_STDIO_CMD:}
+#          args: ${MCP_DEFAULT_STDIO_ARGS:}
+#        refresh:
+#          every-steps: 5
     namespace:
       enabled: true
       separator: "__"

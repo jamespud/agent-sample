@@ -16,8 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class AgentConfig {
 
   /**
-   * Postgres 向量存储配置
-   * 使用 PgVectorStore 结合 OpenAI Embedding Model
+   * Postgres 向量存储配置 使用 PgVectorStore 结合 OpenAI Embedding Model
    */
   @Bean
   public PgVectorStore vectorStore(JdbcTemplate jdbcTemplate,

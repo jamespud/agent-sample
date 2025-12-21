@@ -88,7 +88,8 @@ public class ModelRoutingConfig {
     }
     // 使用 Ark 多模态嵌入模型（兼容 OpenAI base-url）
     log.info("Using Ark multimodal embedding model: baseUrl={}, path={}, model={}",
-        openaiBaseUrl, embeddingsPath, embeddingModelName);
-    return new ArkMultimodalEmbeddingModel(openaiBaseUrl, embeddingsPath, apiKey, embeddingModelName);
+      openaiBaseUrl, embeddingsPath, embeddingModelName);
+    return new ArkMultimodalEmbeddingModel(openaiBaseUrl, embeddingsPath, apiKey,
+      embeddingModelName);
   }
 }

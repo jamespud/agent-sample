@@ -65,6 +65,9 @@ public class AgentController {
       if (request.getRagEnabled() != null) {
         ctxBuilder.ragEnabled(request.getRagEnabled());
       }
+      if (request.getEnabledMcpServers() != null) {
+        ctxBuilder.enabledMcpServers(request.getEnabledMcpServers());
+      }
 
       AgentResult result = agentKernel.execute(ctxBuilder.build());
 
@@ -155,6 +158,7 @@ public class AgentController {
     private Integer maxSteps;
     private String modelProvider;
     private Boolean ragEnabled;
+    private List<String> enabledMcpServers;
   }
 
   @Data
@@ -223,6 +227,7 @@ public class AgentController {
   // JVMs that may be used to run this application.
   @Data
   public static class IngestResponse {
+
     private boolean success;
     private int chunks;
     private String message;

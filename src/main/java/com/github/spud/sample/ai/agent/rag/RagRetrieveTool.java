@@ -1,5 +1,6 @@
 package com.github.spud.sample.ai.agent.rag;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.spud.sample.ai.agent.tools.ToolRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
@@ -27,7 +28,7 @@ public class RagRetrieveTool {
   private final ToolRegistry toolRegistry;
   private final RagProperties ragProperties;
   private final RetrievalCache retrievalCache;
-  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @PostConstruct
   public void register() {
@@ -90,8 +91,8 @@ public class RagRetrieveTool {
         .topK(topK)
         .build();
 
+      log.debug("RAG search request: {}", request);
       List<Document> results = vectorStore.similaritySearch(request);
-//      List<Document> results = List.of(); // TODO: 临时禁用检索，避免 demo 环境没有配置向量数据库时报错
 
       // 缓存结果
       retrievalCache.put(query, topK, null, results);
