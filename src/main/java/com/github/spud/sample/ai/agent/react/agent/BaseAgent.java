@@ -4,6 +4,7 @@ import com.github.spud.sample.ai.agent.state.AgentState;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
@@ -34,12 +35,16 @@ public abstract class BaseAgent {
   @Setter
   protected List<Message> messages;
 
+  @Builder.Default
   protected AgentState state = AgentState.IDLE;
 
+  @Builder.Default
   protected Integer maxSteps = 5;
 
+  @Builder.Default
   protected Integer currentStep = 0;
 
+  @Builder.Default
   protected Integer duplicateThreshold = 3;
 
   protected String finalAnswer;
@@ -104,7 +109,7 @@ public abstract class BaseAgent {
           if (StringUtils.hasText(this.finalAnswer)) {
             return this.finalAnswer;
           }
-          return results.isEmpty() ? "No steps executed" : java.lang.String.join("\n", results);
+          return results.isEmpty() ? "No steps executed" : String.join("\n", results);
         }))
         .doFinally(signal -> {
           cleanup();

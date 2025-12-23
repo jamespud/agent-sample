@@ -43,6 +43,4 @@ public class AgentConfig {
       .maxDocumentBatchSize(properties.getMaxDocumentBatchSize())
       .build();
   }
-
-
 }

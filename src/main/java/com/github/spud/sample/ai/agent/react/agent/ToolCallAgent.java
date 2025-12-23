@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.Builder;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
@@ -41,25 +42,11 @@ public class ToolCallAgent extends ReActAgent {
 
   protected final ToolRegistry toolRegistry;
 
+  @Builder.Default
   private ToolChoice toolChoice = ToolChoice.AUTO;
 
+  @Builder.Default
   public List<ToolCall> pendingToolCalls = new ArrayList<>();
-
-//  protected ToolCallAgent(String name, String description, String systemPrompt,
-//    String nextStepPrompt, ChatClient chatClient, List<Message> messages, Integer maxSteps,
-//    Integer duplicateThreshold, ToolRegistry toolRegistry, @Nullable ToolChoice toolChoice) {
-//    super();
-//    this.name = name;
-//    this.description = description;
-//    this.systemPrompt = systemPrompt;
-//    this.nextStepPrompt = nextStepPrompt;
-//    this.chatClient = chatClient;
-//    this.messages = messages != null ? messages : new ArrayList<>();
-//    this.maxSteps = Math.max(this.maxSteps, maxSteps);
-//    this.duplicateThreshold = Math.max(this.duplicateThreshold, duplicateThreshold);
-//    this.toolRegistry = toolRegistry;
-//    this.toolChoice = toolChoice != null ? toolChoice : this.toolChoice;
-//  }
 
   @Override
   protected Mono<Boolean> think() {
@@ -83,9 +70,10 @@ public class ToolCallAgent extends ReActAgent {
         // Call LLM with tools (unless toolChoice is NONE)
         ChatResponse chatResponse;
         try {
+          log.debug("Calling chat client in think() with {} messages", promptMessages.size());
           ChatClientRequestSpec requestSpec = this.chatClient.prompt(prompt);
           if (this.toolChoice != ToolChoice.NONE) {
-            requestSpec.tools(toolRegistry.getAllCallbacks());
+            requestSpec.toolCallbacks(new ArrayList<>(toolRegistry.getAllCallbacks()));
           }
           chatResponse = requestSpec.call().chatResponse();
         } catch (Exception e) {
@@ -178,7 +166,7 @@ public class ToolCallAgent extends ReActAgent {
 
           resultSummaries.add(String.format("Tool '%s': %s",
             toolCall.name(),
-            truncate(toolResult, 100)));
+            StringUtils.truncate(toolResult, 100)));
 
           // Handle terminate tool
           if (TERMINATE_TOOL_NAME.equals(toolCall.name())) {
@@ -249,19 +237,12 @@ public class ToolCallAgent extends ReActAgent {
       this.finalAnswer = answer;
       this.state = AgentState.FINISHED;
 
-      log.info("Terminate handled: finalAnswer={}", truncate(answer, 100));
+      log.info("Terminate handled: finalAnswer={}", StringUtils.truncate(answer, 100));
     } catch (Exception e) {
       log.error("Error parsing terminate arguments: {}", e.getMessage(), e);
       this.finalAnswer = "Task completed (error parsing terminate arguments)";
       this.state = AgentState.FINISHED;
     }
-  }
-
-  private String truncate(String text, int maxLen) {
-    if (text == null) {
-      return "null";
-    }
-    return text.length() > maxLen ? text.substring(0, maxLen) + "..." : text;
   }
 
   @Override

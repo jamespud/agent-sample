@@ -22,7 +22,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * REST API for React Agent sessions
+ * ReAct Agent Api
  */
 @Slf4j
 @RestController
@@ -33,7 +33,7 @@ public class ReActAgentController {
   private final ReActSessionService sessionService;
 
   /**
-   * Create a new React Agent session
+   * 发起一个新的 ReAct 会话
    */
   @PostMapping("/sessions")
   public Mono<ResponseEntity<CreateSessionResponse>> createSession(
@@ -61,7 +61,7 @@ public class ReActAgentController {
   }
 
   /**
-   * Send a message to an existing session
+   * 发送消息到 ReAct 会话
    */
   @PostMapping("/sessions/{conversationId}/messages")
   public Mono<ResponseEntity<SendMessageResponse>> sendMessage(

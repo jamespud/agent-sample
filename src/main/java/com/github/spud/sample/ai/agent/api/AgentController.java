@@ -14,6 +14,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +26,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Agent API Controller 提供 Agent 执行与追踪 API
+ * Kernel Agent API Controller 提供 Agent 执行与追踪 API
  */
 @Slf4j
 @RestController
@@ -51,7 +52,7 @@ public class AgentController {
   @PostMapping("/run")
   public Mono<ResponseEntity<AgentResult>> run(@RequestBody RunRequest request) {
     return Mono.fromCallable(() -> {
-      log.info("Received agent run request: {}", truncate(request.getRequest(), 100));
+      log.info("Received agent run request: {}", StringUtils.truncate(request.getRequest(), 100));
 
       AgentContext.AgentContextBuilder ctxBuilder = AgentContext.builder()
         .userRequest(request.getRequest());
@@ -240,12 +241,5 @@ public class AgentController {
       this.chunks = chunks;
       this.message = message;
     }
-  }
-
-  private String truncate(String text, int maxLen) {
-    if (text == null) {
-      return null;
-    }
-    return text.length() > maxLen ? text.substring(0, maxLen) + "..." : text;
   }
 }

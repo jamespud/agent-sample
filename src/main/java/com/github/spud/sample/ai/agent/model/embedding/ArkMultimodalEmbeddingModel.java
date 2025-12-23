@@ -1,14 +1,13 @@
-package com.github.spud.sample.ai.agent.model;
+package com.github.spud.sample.ai.agent.model.embedding;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.util.ArrayList;
+import com.github.spud.sample.ai.agent.model.embedding.MultimodalEmbeddingsRequest.Input;
+import jakarta.annotation.Nonnull;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
@@ -17,8 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
 /**
- * Ark 多模态嵌入模型 按照火山引擎 Ark API 规范构造请求体： { "model": "...", "input": [ { "type": "text", "text": "..."
- * }, ... ] }
+ * Ark 多模态嵌入模型 按照火山引擎 Ark API 规范构造请求体并调用多模态向量化服务
  */
 @Slf4j
 public class ArkMultimodalEmbeddingModel implements EmbeddingModel {
@@ -50,12 +48,20 @@ public class ArkMultimodalEmbeddingModel implements EmbeddingModel {
   }
 
   @Override
-  public EmbeddingResponse call(EmbeddingRequest request) {
+  public @Nonnull EmbeddingResponse call(@Nonnull EmbeddingRequest request) {
     List<String> texts = request.getInstructions();
-    if (texts == null || texts.isEmpty()) {
+    if (texts.isEmpty()) {
       return new EmbeddingResponse(List.of());
     }
 
+    List<Input> inputs = texts.stream()
+      .map(text -> new Input("text", text))
+      .toList();
+
+    MultimodalEmbeddingsRequest embeddingsRequest = MultimodalEmbeddingsRequest.builder()
+      .model(modelName)
+      .input(inputs)
+      .build();
     try {
       // 构造请求体
       ObjectNode requestBody = objectMapper.createObjectNode();
@@ -74,21 +80,21 @@ public class ArkMultimodalEmbeddingModel implements EmbeddingModel {
       log.debug("Ark embedding request: {}", requestJson);
 
       // 发送请求
-      String responseJson = restClient.post()
+      MultimodalEmbeddingsResponse response = restClient.post()
         .uri(baseUrl + embeddingsPath)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(requestJson)
+        .body(embeddingsRequest)
         .retrieve()
-        .body(String.class);
+        .body(MultimodalEmbeddingsResponse.class);
 
-      log.debug("Ark embedding response: {}", responseJson);
+      log.debug("Ark embedding response: {}", response);
 
-      // 解析响应
-      JsonNode responseNode = objectMapper.readTree(responseJson);
-      List<Embedding> embeddings = parseEmbeddings(responseNode);
+      if (response == null || response.getData() == null) {
+        throw new RuntimeException("Invalid response from Ark embedding API");
+      }
 
-      return new EmbeddingResponse(embeddings);
+      return response.toEmbeddingResponse();
 
     } catch (Exception e) {
       log.error("Ark embedding call failed: {}", e.getMessage(), e);
@@ -96,62 +102,8 @@ public class ArkMultimodalEmbeddingModel implements EmbeddingModel {
     }
   }
 
-  private List<Embedding> parseEmbeddings(JsonNode responseNode) {
-    List<Embedding> embeddings = new ArrayList<>();
-
-    JsonNode dataArray = responseNode.path("data");
-    if (dataArray.isArray()) {
-      for (int i = 0; i < dataArray.size(); i++) {
-        JsonNode item = dataArray.get(i);
-        JsonNode embeddingNode = item.path("embedding");
-
-        if (embeddingNode.isArray()) {
-          float[] vector = new float[embeddingNode.size()];
-          for (int j = 0; j < embeddingNode.size(); j++) {
-            vector[j] = (float) embeddingNode.get(j).asDouble();
-          }
-          embeddings.add(new Embedding(vector, i));
-        }
-      }
-    }
-
-    return embeddings;
-  }
-
-  @Override
-  public float[] embed(String text) {
-    EmbeddingResponse response = call(new EmbeddingRequest(List.of(text), null));
-    if (response.getResults() != null && !response.getResults().isEmpty()) {
-      return response.getResults().get(0).getOutput();
-    }
-    return new float[0];
-  }
-
   @Override
   public float[] embed(Document document) {
-    return embed(document.getText());
-  }
-
-  @Override
-  public List<float[]> embed(List<String> texts) {
-    EmbeddingResponse response = call(new EmbeddingRequest(texts, null));
-    List<float[]> results = new ArrayList<>();
-    if (response.getResults() != null) {
-      for (Embedding emb : response.getResults()) {
-        results.add(emb.getOutput());
-      }
-    }
-    return results;
-  }
-
-  @Override
-  public EmbeddingResponse embedForResponse(List<String> texts) {
-    return call(new EmbeddingRequest(texts, null));
-  }
-
-  @Override
-  public int dimensions() {
-    // doubao-embedding-vision 默认维度，可从配置读取
-    return 1536;
+    throw new UnsupportedOperationException("embed(Document) not supported");
   }
 }

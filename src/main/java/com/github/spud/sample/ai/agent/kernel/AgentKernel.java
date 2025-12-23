@@ -25,6 +25,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * Agent 核心编排器 驱动状态机，协调 think/act/terminate 循环
@@ -102,7 +103,7 @@ public class AgentKernel {
    */
   public AgentResult execute(AgentContext ctx) {
     log.info("Starting agent execution: traceId={}, request='{}'",
-      ctx.getTraceId(), truncate(ctx.getUserRequest(), 100));
+      ctx.getTraceId(), StringUtils.truncate(ctx.getUserRequest(), 100));
 
     // 创建状态机
     StateMachine<AgentState, AgentEvent> sm = stateMachineDriver.create(ctx.getConversationId());
@@ -209,7 +210,7 @@ public class AgentKernel {
       String modelText = assistantMessage.getText();
       messages.add(assistantMessage);
 
-      log.debug("Model response text: {}", truncate(modelText, 300));
+      log.debug("Model response text: {}", StringUtils.truncate(modelText, 300));
 
       // 解析 ReAct JSON
       ReactJsonStep step;
@@ -217,7 +218,7 @@ public class AgentKernel {
         step = reactJsonParser.parse(modelText);
       } catch (ReactJsonParseException e) {
         log.warn("Failed to parse ReAct JSON: {} - Original text: {}",
-          e.getReason(), truncate(e.getOriginalText(), 200));
+          e.getReason(), StringUtils.truncate(e.getOriginalText(), 200));
 
         // 注入纠错提示
         String correctionPrompt = String.format(
@@ -272,7 +273,7 @@ public class AgentKernel {
               .build()
           );
 
-          stepBuilder.promptSummary(truncate(step.getThought(), 200))
+          stepBuilder.promptSummary(StringUtils.truncate(step.getThought(), 200))
             .toolCalls(toolCallRecords)
             .durationMs(System.currentTimeMillis() - startTime);
           ctx.addStepRecord(stepBuilder.build());
@@ -296,7 +297,7 @@ public class AgentKernel {
           ctx.setFinalAnswer(finalAnswer);
           ctx.setTerminationReason(AgentContext.TerminationReason.COMPLETED);
 
-          stepBuilder.promptSummary(truncate(step.getThought(), 200))
+          stepBuilder.promptSummary(StringUtils.truncate(step.getThought(), 200))
             .durationMs(System.currentTimeMillis() - startTime);
           ctx.addStepRecord(stepBuilder.build());
 
@@ -317,7 +318,7 @@ public class AgentKernel {
               "- 如果可以直接回答，使用 {\\\"type\\\":\\\"final\\\", \\\"answer\\\":\\\"...\\\"}";
           messages.add(new SystemMessage(nonePrompt));
 
-          stepBuilder.promptSummary(truncate(step.getThought(), 200))
+          stepBuilder.promptSummary(StringUtils.truncate(step.getThought(), 200))
             .durationMs(System.currentTimeMillis() - startTime);
           ctx.addStepRecord(stepBuilder.build());
 
@@ -367,7 +368,7 @@ public class AgentKernel {
         return;
       }
 
-      log.debug("Executing tool: {} with args: {}", toolName, truncate(toolArgs, 100));
+      log.debug("Executing tool: {} with args: {}", toolName, StringUtils.truncate(toolArgs, 100));
 
       // 执行工具
       ToolExecutionService.ToolExecutionResult result =
@@ -400,7 +401,7 @@ public class AgentKernel {
 
       // 注入 Observation 到消息历史
       messages.add(new SystemMessage(observationJson));
-      log.debug("Injected observation JSON: {}", truncate(observationJson, 300));
+      log.debug("Injected observation JSON: {}", StringUtils.truncate(observationJson, 300));
 
       // 检测 RAG 无数据
       if ("retrieve_knowledge".equals(toolName)) {
@@ -448,12 +449,5 @@ public class AgentKernel {
 
       stateMachineDriver.sendEvent(sm, AgentEvent.FAIL, ctx);
     }
-  }
-
-  private String truncate(String text, int maxLen) {
-    if (text == null) {
-      return null;
-    }
-    return text.length() > maxLen ? text.substring(0, maxLen) + "..." : text;
   }
 }

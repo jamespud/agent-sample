@@ -10,11 +10,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.spud.sample.ai.agent.model.embedding.ArkMultimodalEmbeddingModel;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.embedding.EmbeddingResponseMetadata;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -52,10 +54,24 @@ class ArkMultimodalEmbeddingModelTest {
     // Mock 响应
     String mockResponse = """
       {
-        "data": [
-          {"embedding": [0.1, 0.2, 0.3]},
-          {"embedding": [0.4, 0.5, 0.6]}
-        ]
+        "created": 1743575029,
+        "data": {
+          "embedding": [
+            -0.123046875, -0.35546875, -0.318359375, -0.255859375
+          ],
+          "object": "embedding"
+        },
+        "id": "021743575029461acbe49a31755bec77b2f09448eb15fa9a88e47",
+        "model": "doubao-embedding-vision-250615",
+        "object": "list",
+        "usage": {
+          "prompt_tokens": 13987,
+          "prompt_tokens_details": {
+            "image_tokens": 13800,
+            "text_tokens": 187
+          },
+          "total_tokens": 13987
+        }
       }
       """;
 
@@ -69,9 +85,8 @@ class ArkMultimodalEmbeddingModelTest {
     List<float[]> results = model.embed(List.of("text1", "text2"));
 
     // 断言
-    assertThat(results).hasSize(2);
-    assertThat(results.get(0)).containsExactly(0.1f, 0.2f, 0.3f);
-    assertThat(results.get(1)).containsExactly(0.4f, 0.5f, 0.6f);
+    assertThat(results).hasSize(1);
+    assertThat(results.get(0)).containsExactly(-0.123046875f, -0.35546875f, -0.318359375f, -0.255859375f);
 
     mockServer.verify();
   }
@@ -129,9 +144,24 @@ class ArkMultimodalEmbeddingModelTest {
 
     String mockResponse = """
       {
-        "data": [
-          {"embedding": [1.0, 2.0]}
-        ]
+        "created": 1743575029,
+        "data": {
+          "embedding": [
+            -0.123046875, -0.35546875, -0.318359375, -0.255859375
+          ],
+          "object": "embedding"
+        },
+        "id": "021743575029461acbe49a31755bec77b2f09448eb15fa9a88e47",
+        "model": "doubao-embedding-vision-250615",
+        "object": "list",
+        "usage": {
+          "prompt_tokens": 13987,
+          "prompt_tokens_details": {
+            "image_tokens": 13800,
+            "text_tokens": 187
+          },
+          "total_tokens": 13987
+        }
       }
       """;
 
@@ -142,7 +172,15 @@ class ArkMultimodalEmbeddingModelTest {
     EmbeddingResponse response = model.embedForResponse(List.of("test"));
 
     assertThat(response.getResults()).hasSize(1);
-    assertThat(response.getResults().get(0).getOutput()).containsExactly(1.0f, 2.0f);
+    assertThat(response.getResults().get(0).getOutput()).containsExactly(
+      -0.123046875f, -0.35546875f, -0.318359375f, -0.255859375f);
+
+    EmbeddingResponseMetadata metadata = response.getMetadata();
+    assertThat(metadata).isNotNull();
+    assertThat(metadata.getModel()).isEqualTo("doubao-embedding-vision-250615");
+    assertThat(metadata.getUsage()).isNotNull();
+    assertThat(metadata.getUsage().getPromptTokens()).isEqualTo(13987);
+    assertThat(metadata.getUsage().getTotalTokens()).isEqualTo(13987);
 
     mockServer.verify();
   }
