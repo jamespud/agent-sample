@@ -2,11 +2,11 @@ package com.github.spud.sample.ai.agent.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.spud.sample.ai.agent.react.ReactAgentTestConfig;
-import com.github.spud.sample.ai.agent.react.session.ReactAgentType;
-import com.github.spud.sample.ai.agent.react.session.ReactMessageType;
-import com.github.spud.sample.ai.agent.react.session.repo.ReactAgentMessageRepository;
-import com.github.spud.sample.ai.agent.react.session.repo.ReactAgentSessionRepository;
+import com.github.spud.sample.ai.agent.react.ReActAgentTestConfig;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.react.session.ReActMessageType;
+import com.github.spud.sample.ai.agent.react.session.repo.ReActAgentMessageRepository;
+import com.github.spud.sample.ai.agent.react.session.repo.ReActAgentSessionRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,17 +23,17 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
 @ActiveProfiles("test")
-@Import(ReactAgentTestConfig.class)
-class ReactAgentControllerTest {
+@Import(ReActAgentTestConfig.class)
+class ReActAgentControllerTest {
 
   @Autowired
   private WebTestClient webTestClient;
 
   @Autowired
-  private ReactAgentSessionRepository sessionRepository;
+  private ReActAgentSessionRepository sessionRepository;
 
   @Autowired
-  private ReactAgentMessageRepository messageRepository;
+  private ReActAgentMessageRepository messageRepository;
 
   @Test
   void shouldCreateToolCallSessionAndSendMessage() {
@@ -52,7 +52,7 @@ class ReactAgentControllerTest {
       .bodyValue(requestBody)
       .exchange()
       .expectStatus().isOk()
-      .expectBody(ReactAgentController.CreateSessionResponse.class)
+      .expectBody(ReActAgentController.CreateSessionResponse.class)
       .returnResult()
       .getResponseBody()
       .getConversationId();
@@ -60,7 +60,7 @@ class ReactAgentControllerTest {
     // Verify session exists in DB
     var session = sessionRepository.findByConversationId(conversationId);
     assertThat(session).isPresent();
-    assertThat(session.get().getAgentType()).isEqualTo(ReactAgentType.TOOLCALL);
+    assertThat(session.get().getAgentType()).isEqualTo(ReActAgentType.TOOLCALL);
 
     // Send message
     String messageBody = """
@@ -84,8 +84,8 @@ class ReactAgentControllerTest {
     // Verify messages in DB
     var messages = messageRepository.listMessages(conversationId);
     assertThat(messages).isNotEmpty();
-    assertThat(messages).anyMatch(m -> m.getMessageType() == ReactMessageType.USER);
-    assertThat(messages).anyMatch(m -> m.getMessageType() == ReactMessageType.ASSISTANT);
+    assertThat(messages).anyMatch(m -> m.getMessageType() == ReActMessageType.USER);
+    assertThat(messages).anyMatch(m -> m.getMessageType() == ReActMessageType.ASSISTANT);
   }
 
   @Test
@@ -104,7 +104,7 @@ class ReactAgentControllerTest {
       .bodyValue(requestBody)
       .exchange()
       .expectStatus().isOk()
-      .expectBody(ReactAgentController.CreateSessionResponse.class)
+      .expectBody(ReActAgentController.CreateSessionResponse.class)
       .returnResult()
       .getResponseBody()
       .getConversationId();

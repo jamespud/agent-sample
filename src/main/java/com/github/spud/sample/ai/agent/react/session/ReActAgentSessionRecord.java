@@ -13,17 +13,17 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReactAgentSessionRecord {
+public class ReActAgentSessionRecord {
 
   private String conversationId;
-  private ReactAgentType agentType;
+  private ReActAgentType agentType;
   private String modelProvider;
   private String systemPrompt;
   private String nextStepPrompt;
   private Integer maxSteps;
   private Integer duplicateThreshold;
   private String toolChoice;
-  private ReactSessionStatus status;
+  private ReActSessionStatus status;
   private Integer version;
   private Instant createdAt;
   private Instant updatedAt;

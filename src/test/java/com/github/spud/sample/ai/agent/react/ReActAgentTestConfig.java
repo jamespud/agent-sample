@@ -1,9 +1,11 @@
 package com.github.spud.sample.ai.agent.react;
 
-import com.github.spud.sample.ai.agent.react.session.ReactAgentFactory;
-import com.github.spud.sample.ai.agent.react.session.ReactAgentSessionRecord;
+import com.github.spud.sample.ai.agent.react.agent.ReActAgent;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentFactory;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentSessionRecord;
 import java.util.Collections;
 import java.util.List;
+import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -19,36 +21,33 @@ import reactor.core.publisher.Mono;
  */
 @Slf4j
 @TestConfiguration
-public class ReactAgentTestConfig {
+public class ReActAgentTestConfig {
 
   @Bean
   @Primary
-  public ReactAgentFactory testReactAgentFactory() {
-    return new FakeReactAgentFactory();
+  public ReActAgentFactory testReactAgentFactory() {
+    return new FakeReActAgentFactory();
   }
 
   /**
    * Fake agent factory that returns agents with predictable behavior
    */
-  static class FakeReactAgentFactory implements ReactAgentFactory {
+  static class FakeReActAgentFactory implements ReActAgentFactory {
 
     @Override
-    public ReactAgent create(ReactAgentSessionRecord session, List<Message> historyMessages) {
+    public ReActAgent create(ReActAgentSessionRecord session, List<Message> historyMessages) {
       log.debug("Creating fake agent for testing: conversationId={}", session.getConversationId());
-      return new FakeReactAgent(historyMessages);
+      return new FakeReactAgent.FakeReactAgentBuilderImpl().messages(historyMessages).build();
     }
   }
 
   /**
    * Fake agent that appends predictable messages to history
    */
-  static class FakeReactAgent implements ReactAgent {
+  @SuperBuilder
+  static class FakeReactAgent extends ReActAgent {
 
-    private final List<Message> messages;
-
-    FakeReactAgent(List<Message> messages) {
-      this.messages = messages;
-    }
+    private List<Message> messages;
 
     @Override
     public Mono<String> run(String request) {
@@ -67,6 +66,21 @@ public class ReactAgentTestConfig {
       messages.add(new ToolResponseMessage(Collections.singletonList(toolResponse)));
 
       return Mono.just("final");
+    }
+
+    @Override
+    protected Mono<Boolean> think() {
+      return null;
+    }
+
+    @Override
+    protected Mono<String> act() {
+      return null;
+    }
+
+    @Override
+    protected Mono<String> step() {
+      return null;
     }
   }
 }

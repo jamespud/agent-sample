@@ -1,11 +1,11 @@
 package com.github.spud.sample.ai.agent.api;
 
-import com.github.spud.sample.ai.agent.react.session.ReactAgentType;
-import com.github.spud.sample.ai.agent.react.session.ReactSessionService;
-import com.github.spud.sample.ai.agent.react.session.ReactSessionService.CreateSessionRequest;
-import com.github.spud.sample.ai.agent.react.session.ReactSessionService.SendMessageResponse;
-import com.github.spud.sample.ai.agent.react.session.ReactSessionService.SessionNotFoundException;
-import com.github.spud.sample.ai.agent.react.session.ReactSessionService.VersionConflictException;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.react.session.ReActSessionService;
+import com.github.spud.sample.ai.agent.react.session.ReActSessionService.CreateSessionRequest;
+import com.github.spud.sample.ai.agent.react.session.ReActSessionService.SendMessageResponse;
+import com.github.spud.sample.ai.agent.react.session.ReActSessionService.SessionNotFoundException;
+import com.github.spud.sample.ai.agent.react.session.ReActSessionService.VersionConflictException;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,9 +28,9 @@ import reactor.core.scheduler.Schedulers;
 @RestController
 @RequestMapping("/agent/react")
 @RequiredArgsConstructor
-public class ReactAgentController {
+public class ReActAgentController {
 
-  private final ReactSessionService sessionService;
+  private final ReActSessionService sessionService;
 
   /**
    * Create a new React Agent session
@@ -99,7 +99,7 @@ public class ReactAgentController {
   @Data
   public static class CreateSessionRequestDto {
 
-    private ReactAgentType agentType;
+    private ReActAgentType agentType;
     private String modelProvider;
     private Integer maxSteps;
     private String toolChoice;

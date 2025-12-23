@@ -1,8 +1,8 @@
 package com.github.spud.sample.ai.agent.react.session;
 
-import com.github.spud.sample.ai.agent.react.ReactAgent;
-import com.github.spud.sample.ai.agent.react.session.repo.ReactAgentMessageRepository;
-import com.github.spud.sample.ai.agent.react.session.repo.ReactAgentSessionRepository;
+import com.github.spud.sample.ai.agent.react.agent.BaseAgent;
+import com.github.spud.sample.ai.agent.react.session.repo.ReActAgentMessageRepository;
+import com.github.spud.sample.ai.agent.react.session.repo.ReActAgentSessionRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -19,13 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReactSessionService {
+public class ReActSessionService {
 
-  private final ReactAgentSessionRepository sessionRepository;
-  private final ReactAgentMessageRepository messageRepository;
-  private final ReactAgentFactory agentFactory;
-  private final ReactMessageMapper messageMapper;
-  private final ReactAgentDefaultsProperties defaults;
+  private final ReActAgentSessionRepository sessionRepository;
+  private final ReActAgentMessageRepository messageRepository;
+  private final ReActAgentFactory agentFactory;
+  private final ReActMessageMapper messageMapper;
+  private final ReActAgentDefaultsProperties defaults;
 
   /**
    * Create a new session
@@ -35,7 +35,7 @@ public class ReactSessionService {
     String conversationId = UUID.randomUUID().toString();
     Instant now = Instant.now();
 
-    ReactAgentSessionRecord record = ReactAgentSessionRecord.builder()
+    ReActAgentSessionRecord record = ReActAgentSessionRecord.builder()
       .conversationId(conversationId)
       .agentType(req.getAgentType())
       .modelProvider(
@@ -46,14 +46,14 @@ public class ReactSessionService {
       .duplicateThreshold(defaults.getDuplicateThreshold())
       .toolChoice(
         req.getToolChoice() != null ? req.getToolChoice() : defaults.getToolChoiceDefault())
-      .status(ReactSessionStatus.ACTIVE)
+      .status(ReActSessionStatus.ACTIVE)
       .version(0)
       .createdAt(now)
       .updatedAt(now)
       .build();
 
     List<String> enabledMcpServers = null;
-    if (req.getAgentType() == ReactAgentType.MCP && req.getEnabledMcpServers() != null) {
+    if (req.getAgentType() == ReActAgentType.MCP && req.getEnabledMcpServers() != null) {
       enabledMcpServers = req.getEnabledMcpServers();
     }
 
@@ -70,7 +70,7 @@ public class ReactSessionService {
   @Transactional
   public SendMessageResponse sendMessage(String conversationId, String content) {
     // Load session
-    ReactAgentSessionRecord session = sessionRepository.findByConversationId(conversationId)
+    ReActAgentSessionRecord session = sessionRepository.findByConversationId(conversationId)
       .orElseThrow(() -> new SessionNotFoundException("Session not found: " + conversationId));
 
     // Serialize concurrent requests for same conversation (optimistic locking)
@@ -81,13 +81,13 @@ public class ReactSessionService {
     }
 
     // Load history messages
-    List<ReactAgentMessageRecord> historyRecords = messageRepository.listMessages(conversationId);
+    List<ReActAgentMessageRecord> historyRecords = messageRepository.listMessages(conversationId);
     List<Message> historyMessages = messageMapper.toMessages(historyRecords);
 
     int beforeSize = historyMessages.size();
 
     // Create agent instance (new instance, not singleton)
-    ReactAgent agent = agentFactory.create(session, historyMessages);
+    BaseAgent agent = agentFactory.create(session, historyMessages);
 
     // Run agent (blocking)
     String answer = agent.run(content).block();
@@ -96,7 +96,7 @@ public class ReactSessionService {
     List<Message> appendedMessages = historyMessages.subList(beforeSize, historyMessages.size());
 
     // Convert to records and persist
-    List<ReactAgentMessageRecord> appendedRecords = messageMapper.toRecords(
+    List<ReActAgentMessageRecord> appendedRecords = messageMapper.toRecords(
       conversationId,
       appendedMessages
     );
@@ -117,7 +117,7 @@ public class ReactSessionService {
       .build();
   }
 
-  private List<MessageDto> toMessageDtos(List<ReactAgentMessageRecord> records) {
+  private List<MessageDto> toMessageDtos(List<ReActAgentMessageRecord> records) {
     return records.stream()
       .map(r -> MessageDto.builder()
         .messageType(r.getMessageType())
@@ -132,7 +132,7 @@ public class ReactSessionService {
   @Data
   public static class CreateSessionRequest {
 
-    private ReactAgentType agentType;
+    private ReActAgentType agentType;
     private String modelProvider;
     private Integer maxSteps;
     private String toolChoice;
@@ -153,7 +153,7 @@ public class ReactSessionService {
   @lombok.Builder
   public static class MessageDto {
 
-    private ReactMessageType messageType;
+    private ReActMessageType messageType;
     private String content;
     private String toolCallId;
     private String toolName;

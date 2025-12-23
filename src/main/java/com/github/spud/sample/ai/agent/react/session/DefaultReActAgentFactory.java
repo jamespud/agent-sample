@@ -2,10 +2,10 @@ package com.github.spud.sample.ai.agent.react.session;
 
 import com.github.spud.sample.ai.agent.mcp.McpClientManager;
 import com.github.spud.sample.ai.agent.mcp.McpToolSynchronizer;
-import com.github.spud.sample.ai.agent.react.ReactAgent;
 import com.github.spud.sample.ai.agent.react.agent.McpAgent;
+import com.github.spud.sample.ai.agent.react.agent.ReActAgent;
 import com.github.spud.sample.ai.agent.react.agent.ToolCallAgent;
-import com.github.spud.sample.ai.agent.react.session.repo.ReactAgentSessionRepository;
+import com.github.spud.sample.ai.agent.react.session.repo.ReActAgentSessionRepository;
 import com.github.spud.sample.ai.agent.state.ToolChoice;
 import com.github.spud.sample.ai.agent.tools.ToolRegistry;
 import java.util.List;
@@ -22,16 +22,16 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class DefaultReactAgentFactory implements ReactAgentFactory {
+public class DefaultReActAgentFactory implements ReActAgentFactory {
 
   private final ChatClient chatClient;
   private final ToolRegistry toolRegistry;
   private final McpClientManager mcpClientManager;
   private final McpToolSynchronizer mcpToolSynchronizer;
-  private final ReactAgentSessionRepository sessionRepository;
+  private final ReActAgentSessionRepository sessionRepository;
 
   @Override
-  public ReactAgent create(ReactAgentSessionRecord session, List<Message> historyMessages) {
+  public ReActAgent create(ReActAgentSessionRecord session, List<Message> historyMessages) {
     log.debug("Creating new {} agent instance for conversationId={}",
       session.getAgentType(), session.getConversationId());
 

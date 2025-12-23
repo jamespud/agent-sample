@@ -1,13 +1,13 @@
 package com.github.spud.sample.ai.agent.react.session;
 
-import com.github.spud.sample.ai.agent.react.ReactAgent;
+import com.github.spud.sample.ai.agent.react.agent.ReActAgent;
 import java.util.List;
 import org.springframework.ai.chat.messages.Message;
 
 /**
  * Factory for creating React Agent instances
  */
-public interface ReactAgentFactory {
+public interface ReActAgentFactory {
 
   /**
    * Create a new agent instance based on session configuration
@@ -16,5 +16,5 @@ public interface ReactAgentFactory {
    * @param historyMessages conversation history to initialize agent with
    * @return new agent instance
    */
-  ReactAgent create(ReactAgentSessionRecord session, List<Message> historyMessages);
+  ReActAgent create(ReActAgentSessionRecord session, List<Message> historyMessages);
 }

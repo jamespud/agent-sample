@@ -14,14 +14,14 @@ import org.springframework.stereotype.Component;
  * Mapper between DB records and Spring AI Messages
  */
 @Component
-public class ReactMessageMapper {
+public class ReActMessageMapper {
 
   /**
    * Convert DB records to Spring AI messages
    */
-  public List<Message> toMessages(List<ReactAgentMessageRecord> records) {
+  public List<Message> toMessages(List<ReActAgentMessageRecord> records) {
     List<Message> messages = new ArrayList<>();
-    for (ReactAgentMessageRecord record : records) {
+    for (ReActAgentMessageRecord record : records) {
       Message message = toMessage(record);
       if (message != null) {
         messages.add(message);
@@ -33,7 +33,7 @@ public class ReactMessageMapper {
   /**
    * Convert single DB record to Spring AI message
    */
-  public Message toMessage(ReactAgentMessageRecord record) {
+  public Message toMessage(ReActAgentMessageRecord record) {
     return switch (record.getMessageType()) {
       case SYSTEM -> new SystemMessage(record.getContent() != null ? record.getContent() : "");
       case USER -> new UserMessage(record.getContent() != null ? record.getContent() : "");
@@ -55,29 +55,29 @@ public class ReactMessageMapper {
   /**
    * Convert Spring AI messages to DB records (for appending after agent run)
    */
-  public List<ReactAgentMessageRecord> toRecords(
+  public List<ReActAgentMessageRecord> toRecords(
     String conversationId,
     List<Message> messages
   ) {
-    List<ReactAgentMessageRecord> records = new ArrayList<>();
+    List<ReActAgentMessageRecord> records = new ArrayList<>();
     for (Message message : messages) {
       records.addAll(toRecordsForMessage(conversationId, message));
     }
     return records;
   }
 
-  private List<ReactAgentMessageRecord> toRecordsForMessage(
+  private List<ReActAgentMessageRecord> toRecordsForMessage(
     String conversationId,
     Message message
   ) {
-    ReactAgentMessageRecord.ReactAgentMessageRecordBuilder builder =
-      ReactAgentMessageRecord.builder().conversationId(conversationId);
+    ReActAgentMessageRecord.ReActAgentMessageRecordBuilder builder =
+      ReActAgentMessageRecord.builder().conversationId(conversationId);
 
     switch (message.getMessageType()) {
       case SYSTEM:
         return Collections.singletonList(
           builder
-            .messageType(ReactMessageType.SYSTEM)
+            .messageType(ReActMessageType.SYSTEM)
             .content(message.getText())
             .build()
         );
@@ -85,7 +85,7 @@ public class ReactMessageMapper {
       case USER:
         return Collections.singletonList(
           builder
-            .messageType(ReactMessageType.USER)
+            .messageType(ReActMessageType.USER)
             .content(message.getText())
             .build()
         );
@@ -93,7 +93,7 @@ public class ReactMessageMapper {
       case ASSISTANT:
         return Collections.singletonList(
           builder
-            .messageType(ReactMessageType.ASSISTANT)
+            .messageType(ReActMessageType.ASSISTANT)
             .content(message.getText())
             .build()
         );
@@ -102,11 +102,11 @@ public class ReactMessageMapper {
         // ToolResponseMessage may contain multiple tool responses
         if (message instanceof ToolResponseMessage) {
           ToolResponseMessage toolMsg = (ToolResponseMessage) message;
-          List<ReactAgentMessageRecord> toolRecords = new ArrayList<>();
+          List<ReActAgentMessageRecord> toolRecords = new ArrayList<>();
           for (ToolResponseMessage.ToolResponse response : toolMsg.getResponses()) {
             toolRecords.add(
               builder
-                .messageType(ReactMessageType.TOOL)
+                .messageType(ReActMessageType.TOOL)
                 .toolCallId(response.id())
                 .toolName(response.name())
                 .content(response.responseData())
@@ -118,7 +118,7 @@ public class ReactMessageMapper {
         // Fallback for unexpected tool message format
         return Collections.singletonList(
           builder
-            .messageType(ReactMessageType.TOOL)
+            .messageType(ReActMessageType.TOOL)
             .content(message.getText())
             .build()
         );

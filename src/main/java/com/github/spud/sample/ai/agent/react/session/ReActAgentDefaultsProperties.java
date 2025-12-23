@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Getter
-public class ReactAgentDefaultsProperties {
+public class ReActAgentDefaultsProperties {
 
   @Value("${app.agent.system-prompt:You are an intelligent AI agent.}")
   private String systemPrompt;

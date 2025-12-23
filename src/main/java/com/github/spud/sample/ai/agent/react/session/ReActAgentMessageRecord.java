@@ -14,12 +14,12 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReactAgentMessageRecord {
+public class ReActAgentMessageRecord {
 
   private UUID id;
   private String conversationId;
   private Long seq;
-  private ReactMessageType messageType;
+  private ReActMessageType messageType;
   private String content;
   private String toolCallId;
   private String toolName;

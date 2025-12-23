@@ -1,10 +1,8 @@
 package com.github.spud.sample.ai.agent.react.session.repo;
 
-import com.github.spud.sample.ai.agent.react.session.ReactAgentSessionRecord;
-import com.github.spud.sample.ai.agent.react.session.ReactAgentType;
-import com.github.spud.sample.ai.agent.react.session.ReactSessionStatus;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentSessionRecord;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.react.session.ReActSessionStatus;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
@@ -20,34 +18,29 @@ import org.springframework.stereotype.Repository;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class ReactAgentSessionRepository {
+public class ReActAgentSessionRepository {
 
   private final JdbcTemplate jdbcTemplate;
 
-  private static final RowMapper<ReactAgentSessionRecord> ROW_MAPPER = new RowMapper<ReactAgentSessionRecord>() {
-    @Override
-    public ReactAgentSessionRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
-      return ReactAgentSessionRecord.builder()
-        .conversationId(rs.getString("conversation_id"))
-        .agentType(ReactAgentType.valueOf(rs.getString("agent_type")))
-        .modelProvider(rs.getString("model_provider"))
-        .systemPrompt(rs.getString("system_prompt"))
-        .nextStepPrompt(rs.getString("next_step_prompt"))
-        .maxSteps(rs.getInt("max_steps"))
-        .duplicateThreshold(rs.getInt("duplicate_threshold"))
-        .toolChoice(rs.getString("tool_choice"))
-        .status(ReactSessionStatus.valueOf(rs.getString("status")))
-        .version(rs.getInt("version"))
-        .createdAt(rs.getTimestamp("created_at").toInstant())
-        .updatedAt(rs.getTimestamp("updated_at").toInstant())
-        .build();
-    }
-  };
+  private static final RowMapper<ReActAgentSessionRecord> ROW_MAPPER = (rs, rowNum) -> ReActAgentSessionRecord.builder()
+    .conversationId(rs.getString("conversation_id"))
+    .agentType(ReActAgentType.valueOf(rs.getString("agent_type")))
+    .modelProvider(rs.getString("model_provider"))
+    .systemPrompt(rs.getString("system_prompt"))
+    .nextStepPrompt(rs.getString("next_step_prompt"))
+    .maxSteps(rs.getInt("max_steps"))
+    .duplicateThreshold(rs.getInt("duplicate_threshold"))
+    .toolChoice(rs.getString("tool_choice"))
+    .status(ReActSessionStatus.valueOf(rs.getString("status")))
+    .version(rs.getInt("version"))
+    .createdAt(rs.getTimestamp("created_at").toInstant())
+    .updatedAt(rs.getTimestamp("updated_at").toInstant())
+    .build();
 
   /**
    * Create new session with optional MCP servers
    */
-  public void create(ReactAgentSessionRecord record, List<String> enabledMcpServers) {
+  public void create(ReActAgentSessionRecord record, List<String> enabledMcpServers) {
     String sql =
       "INSERT INTO react_agent_session " +
         "(conversation_id, agent_type, model_provider, system_prompt, next_step_prompt, " +
@@ -86,9 +79,9 @@ public class ReactAgentSessionRepository {
   /**
    * Find session by conversationId
    */
-  public Optional<ReactAgentSessionRecord> findByConversationId(String conversationId) {
+  public Optional<ReActAgentSessionRecord> findByConversationId(String conversationId) {
     String sql = "SELECT * FROM react_agent_session WHERE conversation_id = ?";
-    List<ReactAgentSessionRecord> results = jdbcTemplate.query(sql, ROW_MAPPER, conversationId);
+    List<ReActAgentSessionRecord> results = jdbcTemplate.query(sql, ROW_MAPPER, conversationId);
     return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
   }
 

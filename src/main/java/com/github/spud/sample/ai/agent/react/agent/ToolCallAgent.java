@@ -1,7 +1,6 @@
 package com.github.spud.sample.ai.agent.react.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.github.spud.sample.ai.agent.react.ReactAgent;
 import com.github.spud.sample.ai.agent.state.AgentState;
 import com.github.spud.sample.ai.agent.state.ToolChoice;
 import com.github.spud.sample.ai.agent.tools.ToolRegistry;
@@ -27,7 +26,7 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @SuperBuilder
-public class ToolCallAgent extends ReActAgent implements ReactAgent {
+public class ToolCallAgent extends ReActAgent {
 
   private static final String TERMINATE_TOOL_NAME = "terminate";
   private static final String NO_TOOL_CALLS_CORRECTION_PROMPT =
@@ -269,11 +268,5 @@ public class ToolCallAgent extends ReActAgent implements ReactAgent {
   protected void cleanup() {
     log.info("🧹 Cleaning up resources for agent {}...", this.name);
     // TODO: implement any necessary cleanup logic here
-  }
-
-  @Override
-  public Mono<String> run(String request) {
-    return super.run(request)
-      .doFinally(signalType -> this.cleanup());
   }
 }

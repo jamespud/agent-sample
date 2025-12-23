@@ -2,7 +2,6 @@ package com.github.spud.sample.ai.agent.react.agent;
 
 import com.github.spud.sample.ai.agent.mcp.McpClientManager;
 import com.github.spud.sample.ai.agent.mcp.McpToolSynchronizer;
-import com.github.spud.sample.ai.agent.react.ReactAgent;
 import com.github.spud.sample.ai.agent.state.AgentState;
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +21,7 @@ import reactor.core.publisher.Mono;
  */
 @Slf4j
 @SuperBuilder
-public class McpAgent extends ToolCallAgent implements ReactAgent {
+public class McpAgent extends ToolCallAgent {
 
   private final McpClientManager mcpClientManager;
   private final McpToolSynchronizer mcpToolSynchronizer;

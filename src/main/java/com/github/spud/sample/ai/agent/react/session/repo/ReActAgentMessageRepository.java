@@ -1,9 +1,7 @@
 package com.github.spud.sample.ai.agent.react.session.repo;
 
-import com.github.spud.sample.ai.agent.react.session.ReactAgentMessageRecord;
-import com.github.spud.sample.ai.agent.react.session.ReactMessageType;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.github.spud.sample.ai.agent.react.session.ReActAgentMessageRecord;
+import com.github.spud.sample.ai.agent.react.session.ReActMessageType;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
@@ -19,31 +17,26 @@ import org.springframework.stereotype.Repository;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class ReactAgentMessageRepository {
+public class ReActAgentMessageRepository {
 
   private final JdbcTemplate jdbcTemplate;
 
-  private static final RowMapper<ReactAgentMessageRecord> ROW_MAPPER = new RowMapper<ReactAgentMessageRecord>() {
-    @Override
-    public ReactAgentMessageRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
-      return ReactAgentMessageRecord.builder()
-        .id(UUID.fromString(rs.getString("id")))
-        .conversationId(rs.getString("conversation_id"))
-        .seq(rs.getLong("seq"))
-        .messageType(ReactMessageType.valueOf(rs.getString("message_type")))
-        .content(rs.getString("content"))
-        .toolCallId(rs.getString("tool_call_id"))
-        .toolName(rs.getString("tool_name"))
-        .toolArguments(rs.getString("tool_arguments"))
-        .createdAt(rs.getTimestamp("created_at").toInstant())
-        .build();
-    }
-  };
+  private static final RowMapper<ReActAgentMessageRecord> ROW_MAPPER = (rs, rowNum) -> ReActAgentMessageRecord.builder()
+    .id(UUID.fromString(rs.getString("id")))
+    .conversationId(rs.getString("conversation_id"))
+    .seq(rs.getLong("seq"))
+    .messageType(ReActMessageType.valueOf(rs.getString("message_type")))
+    .content(rs.getString("content"))
+    .toolCallId(rs.getString("tool_call_id"))
+    .toolName(rs.getString("tool_name"))
+    .toolArguments(rs.getString("tool_arguments"))
+    .createdAt(rs.getTimestamp("created_at").toInstant())
+    .build();
 
   /**
    * List all messages for a conversation (ordered by seq)
    */
-  public List<ReactAgentMessageRecord> listMessages(String conversationId) {
+  public List<ReActAgentMessageRecord> listMessages(String conversationId) {
     String sql =
       "SELECT * FROM react_agent_message " +
         "WHERE conversation_id = ? " +
@@ -54,7 +47,7 @@ public class ReactAgentMessageRepository {
   /**
    * Append messages to conversation
    */
-  public void appendMessages(String conversationId, List<ReactAgentMessageRecord> records) {
+  public void appendMessages(String conversationId, List<ReActAgentMessageRecord> records) {
     if (records.isEmpty()) {
       return;
     }
@@ -65,7 +58,7 @@ public class ReactAgentMessageRepository {
         +
         "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-    for (ReactAgentMessageRecord record : records) {
+    for (ReActAgentMessageRecord record : records) {
       jdbcTemplate.update(
         sql,
         conversationId,
