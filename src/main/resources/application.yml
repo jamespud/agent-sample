@@ -74,16 +74,16 @@ app:
 
   mcp:
     servers:
-#      - id: default
-#        enabled: ${MCP_DEFAULT_ENABLED:false}
-#        transport: ${MCP_DEFAULT_TRANSPORT:sse}
-#        sse:
-#          url: ${MCP_DEFAULT_SSE_URL:http://localhost:8000/sse}
-#        stdio:
-#          command: ${MCP_DEFAULT_STDIO_CMD:}
-#          args: ${MCP_DEFAULT_STDIO_ARGS:}
-#        refresh:
-#          every-steps: 5
+    #      - id: default
+    #        enabled: ${MCP_DEFAULT_ENABLED:false}
+    #        transport: ${MCP_DEFAULT_TRANSPORT:sse}
+    #        sse:
+    #          url: ${MCP_DEFAULT_SSE_URL:http://localhost:8000/sse}
+    #        stdio:
+    #          command: ${MCP_DEFAULT_STDIO_CMD:}
+    #          args: ${MCP_DEFAULT_STDIO_ARGS:}
+    #        refresh:
+    #          every-steps: 5
     namespace:
       enabled: true
       separator: "__"

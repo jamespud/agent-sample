@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -40,11 +41,7 @@ public class ToolRegistry {
    */
   public void register(ToolCallback callback) {
     ToolDefinition def = callback.getToolDefinition();
-    if (def != null) {
-      register(def.name(), def, callback);
-    } else {
-      log.warn("Cannot register tool without definition: {}", callback);
-    }
+    register(def.name(), def, callback);
   }
 
   /**
@@ -97,21 +94,15 @@ public class ToolRegistry {
    * 获取"无操作"工具回调（仅用于 THINK 阶段，让模型输出 toolCalls 但不执行） 这些回调的 call() 方法返回占位符，实际执行在 ACT 阶段使用真正的回调
    */
   public Collection<ToolCallback> getNoOpCallbacks() {
-    return definitionMap.entrySet().stream()
-      .map(entry -> new NoOpToolCallback(entry.getValue()))
-      .collect(java.util.stream.Collectors.toList());
+    return definitionMap.values().stream()
+      .map(NoOpToolCallback::new)
+      .collect(Collectors.toList());
   }
 
   /**
    * 无操作工具回调包装器
    */
-  private static class NoOpToolCallback implements ToolCallback {
-
-    private final ToolDefinition definition;
-
-    public NoOpToolCallback(ToolDefinition definition) {
-      this.definition = definition;
-    }
+  private record NoOpToolCallback(ToolDefinition definition) implements ToolCallback {
 
     @Override
     public ToolDefinition getToolDefinition() {
@@ -163,10 +154,8 @@ public class ToolRegistry {
     int index = 1;
     for (ToolDefinition def : definitionMap.values()) {
       sb.append(index++).append(". 工具名: ").append(def.name()).append("\n");
-      sb.append("   描述: ").append(def.description() != null ? def.description() : "无描述")
-        .append("\n");
-      sb.append("   输入Schema: ").append(def.inputSchema() != null ? def.inputSchema() : "{}")
-        .append("\n\n");
+      sb.append("   描述: ").append(def.description()).append("\n");
+      sb.append("   输入Schema: ").append(def.inputSchema()).append("\n\n");
     }
 
     sb.append("【输出要求】\n");

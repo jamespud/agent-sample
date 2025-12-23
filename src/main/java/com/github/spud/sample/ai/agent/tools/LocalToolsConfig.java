@@ -1,6 +1,8 @@
 package com.github.spud.sample.ai.agent.tools;
 
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
@@ -89,7 +91,7 @@ public class LocalToolsConfig {
 
       @Override
       public String call(String toolInput) {
-        return java.time.LocalDateTime.now().toString();
+        return LocalDateTime.now().toString();
       }
     };
 
@@ -124,8 +126,7 @@ public class LocalToolsConfig {
       public String call(String toolInput) {
         // 简单解析 JSON 获取 message
         try {
-          com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-          var node = mapper.readTree(toolInput);
+          var node = JsonUtils.readTree(toolInput);
           return "Echo: " + node.path("message").asText();
         } catch (Exception e) {
           return "Echo: " + toolInput;

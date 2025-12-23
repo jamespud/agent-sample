@@ -53,12 +53,10 @@ public class ModelRoutingConfig {
    * 根据 provider 选择 ChatModel
    */
   public ChatModel selectChatModel(ChatModel openAiChatModel, ChatModel ollamaChatModel) {
-    switch (modelProvider.toLowerCase()) {
-      case "ollama":
-        return ollamaChatModel;
-      default:
-        return openAiChatModel;
+    if (modelProvider.equalsIgnoreCase("ollama")) {
+      return ollamaChatModel;
     }
+    return openAiChatModel;
   }
 
   /**
@@ -67,13 +65,10 @@ public class ModelRoutingConfig {
   public ChatClient getChatClient(String provider, ChatModel openAiChatModel,
     ChatModel ollamaChatModel) {
     ChatModel model;
-    switch (provider.toLowerCase()) {
-      case "ollama":
-        model = ollamaChatModel;
-        break;
-      default:
-        model = openAiChatModel;
-        break;
+    if (provider.equalsIgnoreCase("ollama")) {
+      model = ollamaChatModel;
+    } else {
+      model = openAiChatModel;
     }
     return ChatClient.builder(model).build();
   }

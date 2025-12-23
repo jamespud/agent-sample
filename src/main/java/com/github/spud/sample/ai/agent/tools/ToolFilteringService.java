@@ -1,9 +1,9 @@
 package com.github.spud.sample.ai.agent.tools;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.spud.sample.ai.agent.kernel.AgentContext;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -25,7 +25,6 @@ public class ToolFilteringService {
 
   private final ToolRegistry toolRegistry;
   private final ToolNamespace toolNamespace;
-  private final ObjectMapper objectMapper = new ObjectMapper();
 
   /**
    * 获取本次请求允许使用的工具定义
@@ -117,17 +116,19 @@ public class ToolFilteringService {
    */
   private String buildToolsJsonArray(Collection<ToolDefinition> tools) {
     try {
-      ArrayNode arrayNode = objectMapper.createArrayNode();
+      ArrayNode arrayNode = JsonUtils.objectMapper().createArrayNode();
 
       for (ToolDefinition def : tools) {
-        ObjectNode toolNode = objectMapper.createObjectNode();
+        ObjectNode toolNode = JsonUtils.objectMapper().createObjectNode();
         toolNode.put("name", def.name());
-        toolNode.put("description", def.description() != null ? def.description() : "");
+        def.description();
+        toolNode.put("description", def.description());
 
         // inputSchema 已经是 JSON 字符串，需要解析后再嵌入
-        if (def.inputSchema() != null && !def.inputSchema().isBlank()) {
+        def.inputSchema();
+        if (!def.inputSchema().isBlank()) {
           try {
-            toolNode.set("inputSchema", objectMapper.readTree(def.inputSchema()));
+            toolNode.set("inputSchema", JsonUtils.objectMapper().readTree(def.inputSchema()));
           } catch (Exception e) {
             log.warn("Failed to parse inputSchema for tool {}: {}", def.name(), e.getMessage());
             toolNode.put("inputSchema", def.inputSchema());
@@ -139,7 +140,8 @@ public class ToolFilteringService {
         arrayNode.add(toolNode);
       }
 
-      return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(arrayNode);
+      return JsonUtils.objectMapper().writerWithDefaultPrettyPrinter()
+        .writeValueAsString(arrayNode);
     } catch (Exception e) {
       log.error("Failed to build tools JSON array: {}", e.getMessage(), e);
       return "[]";

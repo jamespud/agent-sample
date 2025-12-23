@@ -1,5 +1,6 @@
 package com.github.spud.sample.ai.agent.mcp;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.spud.sample.ai.agent.tools.ToolNamespace;
 import com.github.spud.sample.ai.agent.tools.ToolRegistry;
 import io.modelcontextprotocol.client.McpSyncClient;
@@ -111,7 +112,7 @@ public class McpToolSynchronizer {
     }
 
     try {
-      com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+      ObjectMapper mapper = new ObjectMapper();
       return mapper.writeValueAsString(tool.inputSchema());
     } catch (Exception e) {
       log.warn("Failed to convert input schema for tool: {}", tool.name(), e);

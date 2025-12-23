@@ -1,5 +1,7 @@
 package com.github.spud.sample.ai.agent.kernel;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonAction;
 import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonParseException;
 import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonParser;
@@ -61,14 +63,14 @@ public class AgentKernel {
   private String degradePrefix;
 
   // THINK 阶段的工具使用约束提示
-  private static final String THINK_TOOL_CONSTRAINT = """
-    
-    【重要约束】
-    在此阶段，你可以查看可用工具并决定是否需要调用它们。
-    - 如果需要使用工具，请输出 tool_calls
-    - 如果不需要工具，请直接生成回答文本
-    - 当你完成任务后，请调用 terminate 工具并提供最终答案
-    """;
+  private static final String THINK_TOOL_CONSTRAINT =
+    """
+      【重要约束】
+      在此阶段，你可以查看可用工具并决定是否需要调用它们。
+      - 如果需要使用工具，请输出 tool_calls
+      - 如果不需要工具，请直接生成回答文本
+      - 当你完成任务后，请调用 terminate 工具并提供最终答案
+      """;
 
   public AgentKernel(ChatClient chatClient, ToolFilteringService toolFilteringService,
     ToolExecutionService toolExecutionService, StateMachineDriver stateMachineDriver,
@@ -254,7 +256,7 @@ public class AgentKernel {
           ctx.setPendingToolName(action.getName());
           try {
             ctx.setPendingToolArgs(
-              new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(action.getArgs())
+              new ObjectMapper().writeValueAsString(action.getArgs())
             );
           } catch (Exception e) {
             log.error("Failed to serialize tool args: {}", e.getMessage(), e);
@@ -374,10 +376,10 @@ public class AgentKernel {
       // 构建 Observation JSON
       String observationJson;
       try {
-        com.fasterxml.jackson.databind.ObjectMapper mapper =
-          new com.fasterxml.jackson.databind.ObjectMapper();
-        com.fasterxml.jackson.databind.node.ObjectNode obsNode = mapper.createObjectNode();
-        com.fasterxml.jackson.databind.node.ObjectNode dataNode = obsNode.putObject("observation");
+        ObjectMapper mapper =
+          new ObjectMapper();
+        ObjectNode obsNode = mapper.createObjectNode();
+        ObjectNode dataNode = obsNode.putObject("observation");
         dataNode.put("tool", toolName);
         dataNode.put("ok", result.isSuccess());
 

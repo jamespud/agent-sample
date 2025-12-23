@@ -32,7 +32,7 @@ public class ToolCallbackAutoRegistrar {
       try {
         ToolDefinition def = callback.getToolDefinition();
 
-        if (def == null || def.name() == null || def.name().isBlank()) {
+        if (def.name().isBlank()) {
           log.warn("Skipping ToolCallback with null/empty definition: {}",
             callback.getClass().getName());
           skipped++;
