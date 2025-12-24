@@ -2,6 +2,8 @@ package com.github.spud.sample.ai.agent.state;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.github.spud.sample.ai.agent.domain.state.AgentEvent;
+import com.github.spud.sample.ai.agent.domain.state.AgentState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.statemachine.StateMachine;

@@ -3,6 +3,7 @@ package com.github.spud.sample.ai.agent.tools;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.github.spud.sample.ai.agent.domain.tools.ToolNamespace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;

@@ -3,7 +3,10 @@ package com.github.spud.sample.ai.agent.kernel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import com.github.spud.sample.ai.agent.state.AgentEvent;
+import com.github.spud.sample.ai.agent.domain.kernel.AgentContext;
+import com.github.spud.sample.ai.agent.domain.kernel.DefaultTerminationPolicy;
+import com.github.spud.sample.ai.agent.domain.kernel.StepRecord;
+import com.github.spud.sample.ai.agent.domain.state.AgentEvent;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

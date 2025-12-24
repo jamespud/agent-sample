@@ -3,6 +3,9 @@ package com.github.spud.sample.ai.agent.kernel.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.github.spud.sample.ai.agent.domain.kernel.protocol.ReactJsonParseException;
+import com.github.spud.sample.ai.agent.domain.kernel.protocol.ReactJsonParser;
+import com.github.spud.sample.ai.agent.domain.kernel.protocol.ReactJsonStep;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

@@ -1,8 +1,8 @@
 package com.github.spud.sample.ai.agent.react;
 
-import com.github.spud.sample.ai.agent.react.agent.ReActAgent;
-import com.github.spud.sample.ai.agent.react.session.ReActAgentFactory;
-import com.github.spud.sample.ai.agent.react.session.ReActAgentSessionRecord;
+import com.github.spud.sample.ai.agent.domain.react.agent.ReActAgent;
+import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentFactory;
+import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentSessionRecord;
 import java.util.Collections;
 import java.util.List;
 import lombok.experimental.SuperBuilder;

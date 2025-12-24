@@ -9,7 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.github.spud.sample.ai.agent.model.embedding.ArkMultimodalEmbeddingModel;
+import com.github.spud.sample.ai.agent.domain.model.embedding.ArkMultimodalEmbeddingModel;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
