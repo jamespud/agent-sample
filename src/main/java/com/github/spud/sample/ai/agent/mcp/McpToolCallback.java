@@ -1,8 +1,12 @@
 package com.github.spud.sample.ai.agent.mcp;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
+import jakarta.annotation.Nonnull;
 import java.util.Map;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +27,6 @@ public class McpToolCallback implements ToolCallback {
   private final String namespacedName;
   private final ToolDefinition toolDefinition;
   private final McpSyncClient client;
-  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
   public McpToolCallback(
     String serverId,
@@ -36,28 +39,26 @@ public class McpToolCallback implements ToolCallback {
     this.namespacedName = namespacedName;
     this.toolDefinition = toolDefinition;
     this.client = client;
-    this.objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
   }
 
   @Override
-  public ToolDefinition getToolDefinition() {
+  public @Nonnull ToolDefinition getToolDefinition() {
     return toolDefinition;
   }
 
   @Override
-  public String call(String toolInput) {
+  public @Nonnull String call(@Nonnull String toolInput) {
     log.debug("Calling MCP tool: {} (server: {}) with input: {}", originalToolName, serverId,
       toolInput);
 
     try {
       // 解析输入参数
       Map<String, Object> params;
-      if (toolInput == null || toolInput.isBlank()) {
+      if (toolInput.isBlank()) {
         params = Map.of();
       } else {
-        params = objectMapper.readValue(toolInput,
-          new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
-          });
+        params = JsonUtils.fromJson(toolInput, new TypeReference<>() {
+        });
       }
 
       // 调用远程工具
@@ -71,7 +72,7 @@ public class McpToolCallback implements ToolCallback {
       // 将所有内容拼接为字符串
       StringBuilder sb = new StringBuilder();
       for (var content : result.content()) {
-        if (content instanceof io.modelcontextprotocol.spec.McpSchema.TextContent textContent) {
+        if (content instanceof TextContent textContent) {
           sb.append(textContent.text());
         } else {
           sb.append(content.toString());

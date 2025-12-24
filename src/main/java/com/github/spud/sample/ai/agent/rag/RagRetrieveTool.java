@@ -1,7 +1,7 @@
 package com.github.spud.sample.ai.agent.rag;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.spud.sample.ai.agent.tools.ToolRegistry;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,6 @@ public class RagRetrieveTool {
   private final ToolRegistry toolRegistry;
   private final RagProperties ragProperties;
   private final RetrievalCache retrievalCache;
-  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @PostConstruct
   public void register() {
@@ -73,7 +72,7 @@ public class RagRetrieveTool {
 
   private String doRetrieve(String toolInput) {
     try {
-      var node = objectMapper.readTree(toolInput);
+      var node = JsonUtils.readTree(toolInput);
       String query = node.path("query").asText();
       int topK = node.has("topK") ? node.path("topK").asInt() : ragProperties.getTopK();
 

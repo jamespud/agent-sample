@@ -1,7 +1,7 @@
 package com.github.spud.sample.ai.agent.kernel;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,8 +50,6 @@ public class QuestionEnhancer {
     }
     """;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
-
   /**
    * 增强用户问题
    */
@@ -97,7 +95,7 @@ public class QuestionEnhancer {
       }
       cleaned = cleaned.trim();
 
-      JsonNode node = objectMapper.readTree(cleaned);
+      JsonNode node = JsonUtils.readTree(cleaned);
 
       String rephrased = node.has("rephrased") ? node.get("rephrased").asText() : original;
 

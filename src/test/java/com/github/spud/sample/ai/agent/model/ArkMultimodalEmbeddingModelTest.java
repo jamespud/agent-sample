@@ -9,7 +9,6 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.spud.sample.ai.agent.model.embedding.ArkMultimodalEmbeddingModel;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +28,10 @@ class ArkMultimodalEmbeddingModelTest {
 
   private RestClient.Builder restClientBuilder;
   private MockRestServiceServer mockServer;
-  private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() {
     restClientBuilder = RestClient.builder();
-    objectMapper = new ObjectMapper();
   }
 
   @Test
@@ -49,7 +46,7 @@ class ArkMultimodalEmbeddingModelTest {
     String modelName = "test-model";
 
     ArkMultimodalEmbeddingModel model = new ArkMultimodalEmbeddingModel(
-      baseUrl, embeddingsPath, apiKey, modelName, restClient, objectMapper);
+      baseUrl, embeddingsPath, apiKey, modelName, restClient);
 
     // Mock 响应
     String mockResponse = """
@@ -86,7 +83,8 @@ class ArkMultimodalEmbeddingModelTest {
 
     // 断言
     assertThat(results).hasSize(1);
-    assertThat(results.get(0)).containsExactly(-0.123046875f, -0.35546875f, -0.318359375f, -0.255859375f);
+    assertThat(results.get(0)).containsExactly(-0.123046875f, -0.35546875f, -0.318359375f,
+      -0.255859375f);
 
     mockServer.verify();
   }
@@ -98,7 +96,7 @@ class ArkMultimodalEmbeddingModelTest {
 
     ArkMultimodalEmbeddingModel model = new ArkMultimodalEmbeddingModel(
       "https://ark.example.com", "/embeddings/multimodal",
-      "test-key", "test-model", restClient, objectMapper);
+      "test-key", "test-model", restClient);
 
     // 空输入不应触发 HTTP 调用
     EmbeddingResponse response = model.call(new EmbeddingRequest(List.of(), null));
@@ -116,7 +114,7 @@ class ArkMultimodalEmbeddingModelTest {
     String embeddingsPath = "/api/v3/embeddings/multimodal";
 
     ArkMultimodalEmbeddingModel model = new ArkMultimodalEmbeddingModel(
-      baseUrl, embeddingsPath, "test-key", "test-model", restClient, objectMapper);
+      baseUrl, embeddingsPath, "test-key", "test-model", restClient);
 
     // Mock 400 错误
     mockServer.expect(requestTo(baseUrl + embeddingsPath))
@@ -140,7 +138,7 @@ class ArkMultimodalEmbeddingModelTest {
     String embeddingsPath = "/api/v3/embeddings/multimodal";
 
     ArkMultimodalEmbeddingModel model = new ArkMultimodalEmbeddingModel(
-      baseUrl, embeddingsPath, "test-key", "test-model", restClient, objectMapper);
+      baseUrl, embeddingsPath, "test-key", "test-model", restClient);
 
     String mockResponse = """
       {

@@ -3,7 +3,6 @@ package com.github.spud.sample.ai.agent.kernel.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,12 +12,10 @@ import org.junit.jupiter.api.Test;
 class ReactJsonParserTest {
 
   private ReactJsonParser parser;
-  private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() {
     parser = new ReactJsonParser();
-    objectMapper = new ObjectMapper();
   }
 
   @Test

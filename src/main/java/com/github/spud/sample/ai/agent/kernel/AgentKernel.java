@@ -1,6 +1,5 @@
 package com.github.spud.sample.ai.agent.kernel;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonAction;
 import com.github.spud.sample.ai.agent.kernel.protocol.ReactJsonParseException;
@@ -11,6 +10,7 @@ import com.github.spud.sample.ai.agent.state.AgentState;
 import com.github.spud.sample.ai.agent.state.StateMachineDriver;
 import com.github.spud.sample.ai.agent.tools.ToolExecutionService;
 import com.github.spud.sample.ai.agent.tools.ToolFilteringService;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -206,11 +206,19 @@ public class AgentKernel {
         .call()
         .chatResponse();
 
+      if (response == null) {
+        log.warn("No chat response received in THINK phase");
+        terminationPolicy.recordEmptyResponse(ctx);
+        return;
+      }
+
       AssistantMessage assistantMessage = response.getResult().getOutput();
       String modelText = assistantMessage.getText();
       messages.add(assistantMessage);
 
-      log.debug("Model response text: {}", StringUtils.truncate(modelText, 300));
+      if (modelText != null) {
+        log.debug("Model response text: {}", StringUtils.truncate(modelText, 300));
+      }
 
       // 解析 ReAct JSON
       ReactJsonStep step;
@@ -257,7 +265,7 @@ public class AgentKernel {
           ctx.setPendingToolName(action.getName());
           try {
             ctx.setPendingToolArgs(
-              new ObjectMapper().writeValueAsString(action.getArgs())
+              JsonUtils.toJson(action.getArgs())
             );
           } catch (Exception e) {
             log.error("Failed to serialize tool args: {}", e.getMessage(), e);
@@ -377,9 +385,7 @@ public class AgentKernel {
       // 构建 Observation JSON
       String observationJson;
       try {
-        ObjectMapper mapper =
-          new ObjectMapper();
-        ObjectNode obsNode = mapper.createObjectNode();
+        ObjectNode obsNode = JsonUtils.objectMapper().createObjectNode();
         ObjectNode dataNode = obsNode.putObject("observation");
         dataNode.put("tool", toolName);
         dataNode.put("ok", result.isSuccess());
@@ -390,7 +396,7 @@ public class AgentKernel {
           dataNode.put("error", result.getError() != null ? result.getError() : "Unknown error");
         }
 
-        observationJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obsNode);
+        observationJson = JsonUtils.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(obsNode);
       } catch (Exception e) {
         log.error("Failed to build observation JSON: {}", e.getMessage(), e);
         observationJson = String.format(

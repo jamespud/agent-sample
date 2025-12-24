@@ -1,5 +1,7 @@
 package com.github.spud.sample.ai.agent.rag;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -25,7 +27,6 @@ public class RetrievalCache {
 
   private final StringRedisTemplate redisTemplate;
   private final RagProperties ragProperties;
-  private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
   /**
    * 获取缓存的检索结果
@@ -36,9 +37,8 @@ public class RetrievalCache {
       String cached = redisTemplate.opsForValue().get(key);
       if (cached != null) {
         log.debug("Retrieval cache hit for key: {}", key);
-        List<CachedDocument> docs = objectMapper.readValue(cached,
-          new com.fasterxml.jackson.core.type.TypeReference<>() {
-          });
+        List<CachedDocument> docs = JsonUtils.fromJson(cached, new TypeReference<>() {
+        });
         return Optional.of(docs);
       }
     } catch (Exception e) {
@@ -62,7 +62,7 @@ public class RetrievalCache {
         ))
         .toList();
 
-      String serialized = objectMapper.writeValueAsString(cachedDocs);
+      String serialized = JsonUtils.toJson(cachedDocs);
       Duration ttl = Duration.ofSeconds(ragProperties.getCache().getRetrieval().getTtl());
       redisTemplate.opsForValue().set(key, serialized, ttl);
       log.debug("Cached retrieval for key: {}", key);

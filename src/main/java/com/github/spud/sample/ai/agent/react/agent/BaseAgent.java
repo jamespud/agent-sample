@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Slf4j
+@Getter
 @SuperBuilder
 public abstract class BaseAgent {
 
@@ -31,8 +32,6 @@ public abstract class BaseAgent {
 
   protected ChatClient chatClient;
 
-  @Getter
-  @Setter
   protected List<Message> messages;
 
   @Builder.Default

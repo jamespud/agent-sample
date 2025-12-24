@@ -6,8 +6,8 @@ import com.github.spud.sample.ai.agent.state.AgentState;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.Builder;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
  * 主要特性： 1. 动态工具集合（从 MCP 服务器） 2. 定期刷新工具列表 3. 检测工具变更并通知 4. 自动清理 MCP 连接
  */
 @Slf4j
+@Getter
 @SuperBuilder
 public class McpAgent extends ToolCallAgent {
 
@@ -27,30 +28,19 @@ public class McpAgent extends ToolCallAgent {
   private final McpToolSynchronizer mcpToolSynchronizer;
 
   // 刷新间隔（步数）
-  @Getter
-  @Setter
+  @Builder.Default
   private int refreshToolsInterval = 5;
 
   // 当前步数计数（用于触发刷新）
+  @Builder.Default
   private int stepsSinceLastRefresh = 0;
 
   // 上次工具快照（用于检测变更）
+  @Builder.Default
   private Map<String, ToolDefinition> lastToolSnapshot = new HashMap<>();
 
   // 启用的 MCP 服务器列表
-  @Getter
-  @Setter
   private List<String> enabledMcpServers;
-
-//  public McpAgent(String name, String description, String systemPrompt, String nextStepPrompt,
-//    ChatClient chatClient, List<Message> messages, Integer maxSteps, Integer duplicateThreshold,
-//    McpClientManager mcpClientManager, McpToolSynchronizer mcpToolSynchronizer,
-//    @Nullable ToolRegistry toolRegistry, @Nullable ToolChoice toolChoice) {
-//    super(name, description, systemPrompt, nextStepPrompt, chatClient, messages, maxSteps,
-//      duplicateThreshold, toolRegistry, toolChoice);
-//    this.mcpClientManager = mcpClientManager;
-//    this.mcpToolSynchronizer = mcpToolSynchronizer;
-//  }
 
   /**
    * 初始化 MCP Agent（扩展父类初始化）

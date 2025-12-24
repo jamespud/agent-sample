@@ -1,6 +1,6 @@
 package com.github.spud.sample.ai.agent.kernel.protocol;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.spud.sample.ai.agent.util.JsonUtils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -15,8 +15,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class ReactJsonParser {
-
-  private final ObjectMapper objectMapper = new ObjectMapper();
 
   // 匹配代码块包裹的 JSON（贪婪匹配到第一个闭合 ```）
   private static final Pattern CODE_BLOCK_PATTERN =
@@ -54,7 +52,7 @@ public class ReactJsonParser {
 
     // 步骤3：反序列化为 ReactJsonStep
     try {
-      ReactJsonStep step = objectMapper.readValue(jsonText, ReactJsonStep.class);
+      ReactJsonStep step = JsonUtils.fromJson(jsonText, ReactJsonStep.class);
 
       // 步骤4：验证结构
       step.validate();
@@ -94,7 +92,7 @@ public class ReactJsonParser {
     if (text.startsWith("{") && text.endsWith("}")) {
       try {
         // 快速验证是否为合法 JSON
-        objectMapper.readTree(text);
+        JsonUtils.readTree(text);
         return text;
       } catch (Exception e) {
         log.debug("Text looks like JSON but parse failed, will try extraction: {}",
@@ -108,7 +106,7 @@ public class ReactJsonParser {
       String candidate = matcher.group();
       try {
         // 验证提取出的片段是否为合法 JSON
-        objectMapper.readTree(candidate);
+        JsonUtils.readTree(candidate);
         log.debug("Extracted JSON object from mixed text, length: {}", candidate.length());
         return candidate;
       } catch (Exception e) {

@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
@@ -26,6 +27,7 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 @Slf4j
+@Getter
 @SuperBuilder
 public class ToolCallAgent extends ReActAgent {
 
