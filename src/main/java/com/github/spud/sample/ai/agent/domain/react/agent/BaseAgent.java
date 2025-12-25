@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -31,7 +32,7 @@ public abstract class BaseAgent {
 
   protected ChatClient chatClient;
 
-  protected List<Message> messages;
+  protected List<AbstractMessage> messages;
 
   @Builder.Default
   protected AgentState state = AgentState.IDLE;

@@ -2,13 +2,13 @@ package com.github.spud.sample.ai.agent.react;
 
 import com.github.spud.sample.ai.agent.domain.react.agent.ReActAgent;
 import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentFactory;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentSessionRecord;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
 import java.util.Collections;
 import java.util.List;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -35,7 +35,7 @@ public class ReActAgentTestConfig {
   static class FakeReActAgentFactory implements ReActAgentFactory {
 
     @Override
-    public ReActAgent create(ReActAgentSessionRecord session, List<Message> historyMessages) {
+    public ReActAgent create(ReActAgentSession session, List<AbstractMessage> historyMessages) {
       log.debug("Creating fake agent for testing: conversationId={}", session.getConversationId());
       return new FakeReactAgent.FakeReactAgentBuilderImpl().messages(historyMessages).build();
     }
@@ -46,8 +46,6 @@ public class ReActAgentTestConfig {
    */
   @SuperBuilder
   static class FakeReactAgent extends ReActAgent {
-
-    private List<Message> messages;
 
     @Override
     public Mono<String> run(String request) {

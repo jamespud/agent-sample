@@ -16,16 +16,16 @@ import org.hibernate.annotations.OnDeleteAction;
 @Setter
 @Entity
 @Table(name = "react_agent_session_mcp_server")
-public class ReactAgentSessionMcpServer {
+public class ReActAgentSessionMcpServer {
 
   @EmbeddedId
-  private ReactAgentSessionMcpServerId id;
+  private ReActAgentSessionMcpServerId id;
 
   @MapsId("conversationId")
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @OnDelete(action = OnDeleteAction.CASCADE)
   @JoinColumn(name = "conversation_id", nullable = false)
-  private ReactAgentSession conversation;
+  private ReActAgentSession conversation;
 
 
 }

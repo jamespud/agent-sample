@@ -13,7 +13,7 @@ import lombok.Setter;
 @Setter
 @EqualsAndHashCode
 @Embeddable
-public class ReactAgentSessionMcpServerId implements Serializable {
+public class ReActAgentSessionMcpServerId implements Serializable {
 
   private static final long serialVersionUID = 6150634035390066104L;
   @Size(max = 255)

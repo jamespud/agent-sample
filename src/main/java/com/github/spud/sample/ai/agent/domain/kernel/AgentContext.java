@@ -114,11 +114,9 @@ public class AgentContext {
    */
   private String enhancementSummary;
 
-  /**
-   * 启用的 MCP server ID 列表
-   */
+
   @Builder.Default
-  private List<String> enabledMcpServers = new ArrayList<>();
+  private List<String> enabledTools = new ArrayList<>();
 
   /**
    * 挂起的工具调用名称（THINK 阶段解析出 action.type=tool 后暂存，ACT 阶段执行）

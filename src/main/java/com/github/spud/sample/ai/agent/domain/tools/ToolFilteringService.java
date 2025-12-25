@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.spud.sample.ai.agent.domain.kernel.AgentContext;
 import com.github.spud.sample.ai.agent.infrastructure.util.JsonUtils;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.stereotype.Service;
 
@@ -24,25 +24,18 @@ import org.springframework.stereotype.Service;
 public class ToolFilteringService {
 
   private final ToolRegistry toolRegistry;
-  private final ToolNamespace toolNamespace;
 
   /**
    * 获取本次请求允许使用的工具定义
    */
   public Collection<ToolDefinition> getAllowedDefinitions(AgentContext ctx) {
-    Collection<ToolDefinition> allTools = toolRegistry.getAllDefinitions();
-    List<ToolDefinition> allowed = new ArrayList<>();
 
-    for (ToolDefinition def : allTools) {
-      if (isToolAllowed(def.name(), ctx)) {
-        allowed.add(def);
-      }
-    }
-
-    log.debug("Filtered tools: total={}, allowed={}, ragEnabled={}, enabledMcpServers={}",
-      allTools.size(), allowed.size(), ctx.isRagEnabled(), ctx.getEnabledMcpServers());
-
-    return allowed;
+    return ctx.getEnabledTools().stream()
+      .map(toolRegistry::getCallback)
+      .filter(Optional::isPresent)
+      .map(Optional::get)
+      .map(ToolCallback::getToolDefinition)
+      .toList();
   }
 
   /**
@@ -76,39 +69,6 @@ public class ToolFilteringService {
     sb.append("- 当你完成任务时，使用 action.type=final 返回最终答案\n");
 
     return sb.toString();
-  }
-
-  /**
-   * 判断工具是否允许在本次请求中使用
-   */
-  private boolean isToolAllowed(String toolName, AgentContext ctx) {
-    // 规则1：永远隐藏 terminate（由 final action 替代）
-    if ("terminate".equals(toolName)) {
-      return false;
-    }
-
-    // 规则2：ragEnabled 控制 retrieve_knowledge
-    if ("retrieve_knowledge".equals(toolName)) {
-      return ctx.isRagEnabled();
-    }
-
-    // 规则3：MCP 工具按命名空间过滤
-    String[] parts = toolNamespace.parse(toolName);
-    String serverId = parts[0]; // null 表示本地工具，非 null 表示 MCP 工具
-
-    if (serverId != null) {
-      // 这是一个带命名空间的 MCP 工具
-      List<String> enabledServers = ctx.getEnabledMcpServers();
-      if (enabledServers == null || enabledServers.isEmpty()) {
-        // 未指定则全部允许
-        return true;
-      }
-
-      return enabledServers.contains(serverId);
-    }
-
-    // 规则4：本地工具（无命名空间）默认允许
-    return true;
   }
 
   /**

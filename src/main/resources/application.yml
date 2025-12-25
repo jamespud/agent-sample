@@ -31,8 +31,11 @@ spring:
         dimensions: 1536
     mcp:
       client:
+        enabled: true
         stdio:
           servers-configuration: classpath:mcp-servers-config.json
+        type: sync
+
 
   # ====================== Data Sources ======================
   datasource:

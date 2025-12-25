@@ -3,13 +3,13 @@ package com.github.spud.sample.ai.agent.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActMessageType;
-import com.github.spud.sample.ai.agent.domain.react.session.repo.ReActAgentMessageRepository;
-import com.github.spud.sample.ai.agent.domain.react.session.repo.ReActAgentSessionRepository;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentMessageRepository;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentSessionRepository;
 import com.github.spud.sample.ai.agent.interfaces.rest.ReActAgentController;
 import com.github.spud.sample.ai.agent.react.ReActAgentTestConfig;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,7 +48,7 @@ class ReActAgentControllerTest {
       """;
 
     String conversationId = webTestClient.post()
-      .uri("/agent/react/sessions")
+      .uri("/agent/react/session/new")
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(requestBody)
       .exchange()
@@ -71,7 +71,7 @@ class ReActAgentControllerTest {
       """;
 
     webTestClient.post()
-      .uri("/agent/react/sessions/" + conversationId + "/messages")
+      .uri("/agent/react/session/" + conversationId + "/messages")
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(messageBody)
       .exchange()
@@ -85,8 +85,8 @@ class ReActAgentControllerTest {
     // Verify messages in DB
     var messages = messageRepository.listMessages(conversationId);
     assertThat(messages).isNotEmpty();
-    assertThat(messages).anyMatch(m -> m.getMessageType() == ReActMessageType.USER);
-    assertThat(messages).anyMatch(m -> m.getMessageType() == ReActMessageType.ASSISTANT);
+    assertThat(messages).anyMatch(m -> m.getMessageType() == MessageType.USER);
+    assertThat(messages).anyMatch(m -> m.getMessageType() == MessageType.ASSISTANT);
   }
 
   @Test
@@ -100,7 +100,7 @@ class ReActAgentControllerTest {
       """;
 
     String conversationId = webTestClient.post()
-      .uri("/agent/react/sessions")
+      .uri("/agent/react/session/new")
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(requestBody)
       .exchange()
@@ -125,7 +125,7 @@ class ReActAgentControllerTest {
       """;
 
     webTestClient.post()
-      .uri("/agent/react/sessions/non-existent-id/messages")
+      .uri("/agent/react/session/non-existent-id/messages")
       .contentType(MediaType.APPLICATION_JSON)
       .bodyValue(messageBody)
       .exchange()

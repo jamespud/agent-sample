@@ -1,13 +1,12 @@
 package com.github.spud.sample.ai.agent.domain.tools;
 
 import com.github.spud.sample.ai.agent.infrastructure.util.JsonUtils;
-import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -15,28 +14,10 @@ import org.springframework.context.annotation.Configuration;
  */
 @Slf4j
 @Configuration
-@RequiredArgsConstructor
-public class LocalToolsConfig {
+public class DefaultLocalTool {
 
-  private final ToolRegistry toolRegistry;
-
-  @PostConstruct
-  public void registerLocalTools() {
-    log.info("Registering local tools...");
-
-    // 注册 terminate 工具
-    registerTerminateTool();
-
-    // 注册 time 工具
-    registerTimeTool();
-
-    // 注册 echo 工具
-    registerEchoTool();
-
-    log.info("Local tools registered: {}", toolRegistry.size());
-  }
-
-  private void registerTerminateTool() {
+  @Bean
+  public ToolCallback registerTerminateTool() {
     ToolDefinition def = DefaultToolDefinition.builder()
       .name("terminate")
       .description(
@@ -68,10 +49,11 @@ public class LocalToolsConfig {
       }
     };
 
-    toolRegistry.register("terminate", def, callback);
+    return callback;
   }
 
-  private void registerTimeTool() {
+  @Bean
+  public ToolCallback registerTimeTool() {
     ToolDefinition def = DefaultToolDefinition.builder()
       .name("get_current_time")
       .description("Get the current date and time")
@@ -95,10 +77,11 @@ public class LocalToolsConfig {
       }
     };
 
-    toolRegistry.register("get_current_time", def, callback);
+    return callback;
   }
 
-  private void registerEchoTool() {
+  @Bean
+  public ToolCallback registerEchoTool() {
     ToolDefinition def = DefaultToolDefinition.builder()
       .name("echo")
       .description("Echo back the input message. Useful for testing.")
@@ -116,7 +99,7 @@ public class LocalToolsConfig {
         """)
       .build();
 
-    ToolCallback callback = new ToolCallback() {
+    return new ToolCallback() {
       @Override
       public ToolDefinition getToolDefinition() {
         return def;
@@ -133,7 +116,5 @@ public class LocalToolsConfig {
         }
       }
     };
-
-    toolRegistry.register("echo", def, callback);
   }
 }

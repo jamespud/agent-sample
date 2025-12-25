@@ -20,7 +20,7 @@ public class JsonUtils extends AbstractJsonParser {
     return objectMapper;
   }
 
-  public static <T> T parseObject(Callable<T> parser, Class<? extends Exception> check) {
+  public static <T> T tryParseObject(Callable<T> parser, Class<? extends Exception> check) {
     return INSTANCE.tryParse(parser, check);
   }
 

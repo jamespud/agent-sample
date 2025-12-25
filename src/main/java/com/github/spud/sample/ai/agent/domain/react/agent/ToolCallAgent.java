@@ -50,6 +50,11 @@ public class ToolCallAgent extends ReActAgent {
   @Builder.Default
   public List<ToolCall> pendingToolCalls = new ArrayList<>();
 
+  // Available tool callbacks for this agent (can be local + MCP)
+  // Subclasses like McpAgent can provide combined callbacks
+  @Builder.Default
+  protected List<ToolCallback> availableCallbacks = new ArrayList<>();
+
   @Override
   protected Mono<Boolean> think() {
     return Mono.fromCallable(() -> {
@@ -75,7 +80,11 @@ public class ToolCallAgent extends ReActAgent {
           log.debug("Calling chat client in think() with {} messages", promptMessages.size());
           ChatClientRequestSpec requestSpec = this.chatClient.prompt(prompt);
           if (this.toolChoice != ToolChoice.NONE) {
-            requestSpec.toolCallbacks(new ArrayList<>(toolRegistry.getAllCallbacks()));
+            // Use injected callbacks if available, otherwise fallback to toolRegistry
+            List<ToolCallback> callbacks = !availableCallbacks.isEmpty() 
+              ? availableCallbacks 
+              : new ArrayList<>(toolRegistry.getAllCallbacks());
+            requestSpec.toolCallbacks(callbacks);
           }
           chatResponse = requestSpec.call().chatResponse();
         } catch (Exception e) {
@@ -211,16 +220,28 @@ public class ToolCallAgent extends ReActAgent {
   }
 
   /**
-   * Execute a single tool call using ToolCallingManager
+   * Execute a single tool call using ToolCallback
    */
   private String executeToolCall(ToolCall toolCall) {
     if (!StringUtils.hasText(toolCall.name())) {
       throw new IllegalArgumentException("Tool call name is empty");
     }
 
-    ToolCallback callback = toolRegistry.getCallback(toolCall.name())
-      .orElseThrow(() -> new IllegalArgumentException(
-        "Unknown tool: " + toolCall.name()));
+    // Find callback from available callbacks first, then fallback to toolRegistry
+    ToolCallback callback = null;
+    
+    if (!availableCallbacks.isEmpty()) {
+      callback = availableCallbacks.stream()
+        .filter(cb -> cb.getToolDefinition().name().equals(toolCall.name()))
+        .findFirst()
+        .orElse(null);
+    }
+    
+    if (callback == null) {
+      callback = toolRegistry.getCallback(toolCall.name())
+        .orElseThrow(() -> new IllegalArgumentException(
+          "Unknown tool: " + toolCall.name()));
+    }
 
     // Execute using callback
     return callback.call(toolCall.arguments());

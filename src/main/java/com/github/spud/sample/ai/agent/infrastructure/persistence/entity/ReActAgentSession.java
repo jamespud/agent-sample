@@ -1,33 +1,43 @@
 package com.github.spud.sample.ai.agent.infrastructure.persistence.entity;
 
+import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "react_agent_session")
-public class ReactAgentSession {
+public class ReActAgentSession {
 
   @Id
   @Size(max = 255)
   @Column(name = "conversation_id", nullable = false)
   private String conversationId;
 
-  @Size(max = 20)
   @NotNull
   @Column(name = "agent_type", nullable = false, length = 20)
-  private String agentType;
+  @Enumerated(EnumType.STRING)
+  private ReActAgentType agentType;
 
   @Size(max = 50)
   @NotNull
@@ -54,11 +64,16 @@ public class ReactAgentSession {
   @Column(name = "tool_choice", nullable = false, length = 20)
   private String toolChoice;
 
-  @Size(max = 20)
   @NotNull
   @ColumnDefault("'ACTIVE'")
   @Column(name = "status", nullable = false, length = 20)
-  private String status;
+  @Enumerated(EnumType.STRING)
+  private ReActSessionStatus status = ReActSessionStatus.ACTIVE;
+
+  @OneToMany(fetch = FetchType.LAZY)
+  @OnDelete(action = OnDeleteAction.CASCADE)
+  @JoinColumn(name = "conversation_id", referencedColumnName = "conversation_id")
+  private List<ReActAgentMessage> messages;
 
   @NotNull
   @ColumnDefault("0")

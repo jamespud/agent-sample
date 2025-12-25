@@ -66,8 +66,8 @@ public class AgentController {
       if (request.getRagEnabled() != null) {
         ctxBuilder.ragEnabled(request.getRagEnabled());
       }
-      if (request.getEnabledMcpServers() != null) {
-        ctxBuilder.enabledMcpServers(request.getEnabledMcpServers());
+      if (request.getEnabledTools() != null) {
+        ctxBuilder.enabledTools(request.getEnabledTools());
       }
 
       AgentResult result = agentKernel.execute(ctxBuilder.build());
@@ -159,7 +159,7 @@ public class AgentController {
     private Integer maxSteps;
     private String modelProvider;
     private Boolean ragEnabled;
-    private List<String> enabledMcpServers;
+    private List<String> enabledTools;
   }
 
   @Data

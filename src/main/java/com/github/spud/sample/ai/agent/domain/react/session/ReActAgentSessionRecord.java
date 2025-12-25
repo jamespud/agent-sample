@@ -1,6 +1,6 @@
 package com.github.spud.sample.ai.agent.domain.react.session;
 
-import java.time.Instant;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,6 +25,19 @@ public class ReActAgentSessionRecord {
   private String toolChoice;
   private ReActSessionStatus status;
   private Integer version;
-  private Instant createdAt;
-  private Instant updatedAt;
+
+  public ReActAgentSession toEntity() {
+    ReActAgentSession entity = new ReActAgentSession();
+    entity.setConversationId(this.conversationId);
+    entity.setAgentType(this.agentType);
+    entity.setModelProvider(this.modelProvider);
+    entity.setSystemPrompt(this.systemPrompt);
+    entity.setNextStepPrompt(this.nextStepPrompt);
+    entity.setMaxSteps(this.maxSteps);
+    entity.setDuplicateThreshold(this.duplicateThreshold);
+    entity.setToolChoice(this.toolChoice);
+    entity.setStatus(this.status);
+    entity.setVersion(this.version);
+    return entity;
+  }
 }

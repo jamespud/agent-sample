@@ -1,18 +1,18 @@
 package com.github.spud.sample.ai.agent.domain.react.session;
 
 import com.github.spud.sample.ai.agent.domain.mcp.McpClientManager;
-import com.github.spud.sample.ai.agent.domain.mcp.McpToolSynchronizer;
 import com.github.spud.sample.ai.agent.domain.react.agent.McpAgent;
 import com.github.spud.sample.ai.agent.domain.react.agent.ReActAgent;
 import com.github.spud.sample.ai.agent.domain.react.agent.ToolCallAgent;
-import com.github.spud.sample.ai.agent.domain.react.session.repo.ReActAgentSessionRepository;
 import com.github.spud.sample.ai.agent.domain.state.ToolChoice;
 import com.github.spud.sample.ai.agent.domain.tools.ToolRegistry;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentSessionRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,11 +27,10 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
   private final ChatClient chatClient;
   private final ToolRegistry toolRegistry;
   private final McpClientManager mcpClientManager;
-  private final McpToolSynchronizer mcpToolSynchronizer;
   private final ReActAgentSessionRepository sessionRepository;
 
   @Override
-  public ReActAgent create(ReActAgentSessionRecord session, List<Message> historyMessages) {
+  public ReActAgent create(ReActAgentSession session, List<AbstractMessage> historyMessages) {
     log.debug("Creating new {} agent instance for conversationId={}",
       session.getAgentType(), session.getConversationId());
 
@@ -39,7 +38,8 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
 
     switch (session.getAgentType()) {
       case TOOLCALL:
-        return ToolCallAgent.builder()
+        // ToolAgent only uses local tools from ToolRegistry
+        ToolCallAgent toolAgent = ToolCallAgent.builder()
           .name("react-toolcall-" + session.getConversationId())
           .description("React tool-calling agent")
           .systemPrompt(session.getSystemPrompt())
@@ -51,6 +51,10 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
           .duplicateThreshold(session.getDuplicateThreshold())
           .toolRegistry(toolRegistry)
           .build();
+        
+        // Explicitly set availableCallbacks to empty, will fall back to toolRegistry
+        // This ensures ToolAgent boundary is enforced
+        return toolAgent;
 
       case MCP:
         List<String> enabledMcpServers = sessionRepository.listEnabledMcpServers(
@@ -68,10 +72,9 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
           .duplicateThreshold(session.getDuplicateThreshold())
           .toolRegistry(toolRegistry)
           .mcpClientManager(mcpClientManager)
-          .mcpToolSynchronizer(mcpToolSynchronizer)
           .build();
 
-        // Initialize MCP with enabled servers
+        // Initialize MCP with enabled servers (builds and injects MCP callbacks)
         mcpAgent.initializeMcp(enabledMcpServers, 5);
 
         return mcpAgent;

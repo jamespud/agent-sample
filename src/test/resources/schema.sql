@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS react_agent_message
     tool_call_id    VARCHAR(255),
     tool_name       VARCHAR(255),
     tool_arguments  TEXT,
+    metadata        TEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     FOREIGN KEY (conversation_id) REFERENCES react_agent_session (conversation_id) ON DELETE CASCADE

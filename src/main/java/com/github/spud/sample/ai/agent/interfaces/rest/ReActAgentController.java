@@ -36,7 +36,7 @@ public class ReActAgentController {
   /**
    * 发起一个新的 ReAct 会话
    */
-  @PostMapping("/sessions")
+  @PostMapping("/session/new")
   public Mono<ResponseEntity<CreateSessionResponse>> createSession(
     @RequestBody CreateSessionRequestDto request
   ) {
@@ -61,7 +61,7 @@ public class ReActAgentController {
       });
   }
 
-  @GetMapping("/sessions/list")
+  @GetMapping("/session/list")
   public Mono<ResponseEntity<List<String>>> listSessions() {
     return Mono.fromCallable(() -> {
       log.info("Listing all ReAct sessions");
@@ -72,7 +72,7 @@ public class ReActAgentController {
   /**
    * 发送消息到 ReAct 会话
    */
-  @PostMapping("/sessions/{conversationId}/messages")
+  @PostMapping("/session/{conversationId}/messages")
   public Mono<ResponseEntity<SendMessageResponse>> sendMessage(
     @PathVariable String conversationId,
     @RequestBody SendMessageRequestDto request
