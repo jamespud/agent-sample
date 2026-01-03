@@ -1,0 +1,80 @@
+# Integration Test Profile - Production-like environment with Testcontainers
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+
+  # Datasource will be dynamically injected by ContainersSupport
+  # (no need to specify url/username/password here)
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  # Enable Flyway with production migrations
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # Redis will be dynamically injected by ContainersSupport
+  data:
+    redis:
+      # host/port injected by @DynamicPropertySource
+      timeout: 5s
+  cache:
+    type: redis
+
+  # JPA settings
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  # AI model config - MockWebServer will inject base-url
+  ai:
+    retry:
+      max-attempts: 1
+    openai:
+      api-key: test-key-it
+      # base-url dynamically injected by OpenAiMockSupport
+      chat:
+        options:
+          model: gpt-4o-test
+      embedding:
+        enabled: false
+    ollama:
+      enabled: false
+    mcp:
+      client:
+        enabled: false
+
+# Application config
+app:
+  model:
+    provider: openai
+    chat-model: gpt-4o-test
+
+  agent:
+    max-steps: 5
+    duplicate-threshold: 2
+    empty-threshold: 2
+    system-prompt: "You are a test agent. Use tools when needed."
+    next-step-prompt: "Decide the next action."
+    tool-choice-default: AUTO
+
+  mcp:
+    namespace:
+      enabled: true
+      separator: "__"
+    servers: []
+
+  rag:
+    enabled: false
+
+logging:
+  level:
+    org.springframework.ai: INFO
+    com.github.spud.sample.ai: DEBUG
+    org.testcontainers: INFO

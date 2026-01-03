@@ -84,8 +84,13 @@ public abstract class BaseAgent {
       this.state = AgentState.ACTING;
 
       return Flux.range(1, this.maxSteps)
-        .takeWhile(i -> this.state != AgentState.FINISHED)
         .concatMap(i -> {
+          // Check FINISHED state at the start of each step
+          if (this.state == AgentState.FINISHED) {
+            log.info("Agent already finished, skipping step {}", i);
+            return Mono.empty();
+          }
+          
           this.currentStep = i;
           log.info("Executing step {}/{}", this.currentStep, this.maxSteps);
           return this.step()

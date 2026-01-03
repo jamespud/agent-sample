@@ -1,12 +1,12 @@
-# Agent Sample - Spring AI Agent Framework
+# Agent Sample - Spring AI ReAct Agent Framework
 
 基于 Spring Boot 3.5 + Spring AI 1.0.3 的生产可用 AI Agent 框架，支持：
 
 - **多模型**：OpenAI (及兼容 API) + Ollama
 - **MCP**：支持 SSE 和 STDIO 传输，多服务器配置
 - **RAG**：pgvector 向量检索 + Redis 缓存
-- **状态机**：Spring Statemachine 驱动的 think/act 循环
-- **可观测性**：完整的步骤追踪与轨迹记录
+- **ReAct Agent**：Session-based 对话流，自动 Tool Callback 机制
+- **可观测性**：完整的消息记录与会话追踪
 
 ## 快速开始
 
@@ -38,44 +38,100 @@ export OPENAI_API_KEY=sk-your-api-key
 ./mvnw spring-boot:run
 ```
 
-### 4. 测试 API
+### 4. 测试 ReAct Agent API
 
 ```bash
-# 执行 Agent
-curl -X POST http://localhost:8080/agent/run \
+# 创建新会话
+curl -X POST http://localhost:8080/agent/react/session/new \
   -H "Content-Type: application/json" \
-  -d '{"request": "What time is it?"}'
+  -d '{"model": "gpt-4o", "temperature": 0.7}'
 
-# 查看执行轨迹
-curl http://localhost:8080/agent/{traceId}
 
-# RAG 数据摄取
-curl -X POST http://localhost:8080/agent/rag/ingest/text \
+# 返回 {"conversationId": "uuid-xxx"}
+
+# 发送消息到会话
+curl -X POST http://localhost:8080/agent/react/session/{conversationId}/message \
   -H "Content-Type: application/json" \
-  -d '{"content": "Spring AI is a framework for building AI applications.", "metadata": {"source": "docs"}}'
+  -d '{"question": "What time is it?"}'
+
+# 返回示例
+# {
+#   "conversationId": "uuid-xxx",
+#   "answer": "The current time is 14:23:45 UTC",
+#   "finished": true,
+#   "steps": 2,
+#   "toolCalls": ["get_current_time"]
+# }
+```
+
+### 5. 测试 RAG 数据注入
+
+```bash
+# 注入文本知识
+curl -X POST http://localhost:8080/rag/ingest/text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "The company was founded in 2024 by Alice and Bob.",
+    "metadata": {"source": "company_intro"}
+  }'
+
+# 注入文件（仅限 RAG 启用时）
+curl -X POST http://localhost:8080/rag/ingest/file \
+  -F "file=@document.pdf" \
+  -F "metadata={\"category\":\"legal\"}"
 ```
 
 ## 架构
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AgentController                         │
-│                    (REST API: /agent/*)                         │
-└─────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                          AgentKernel                            │
-│               (核心编排器: think/act 循环)                        │
-└─────────────────────────────────────────────────────────────────┘
-         │              │              │              │
-         ▼              ▼              ▼              ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│ StateMachine│ │ ToolRegistry│ │    RAG      │ │    MCP      │
-│   Driver    │ │  + Executor │ │  Retrieve   │ │ Synchronizer│
-└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
-         │              │              │              │
-         ▼              ▼              ▼              ▼
+┌──────────────────────────────────────────────────────────────┐
+│              ReActAgentController (REST Layer)               │
+│          /agent/react/session/new  ←→  /session/{id}/message│
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────┐
+│             ReActSessionService (Session Manager)            │
+│  • Manages Conversation Context (ReactAgentSession)          │
+│  • Handles Message Persistence (ReactAgentMessage)           │
+│  • Coordinates Agent Execution                               │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────┐
+│              ReActAgent Hierarchy (Core Logic)               │
+│  • BaseAgent: State management & step execution              │
+│  • ToolCallAgent: Spring AI Tools (local functions)          │
+│  • McpAgent: MCP Servers (external tools)                    │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ Local Tools  │ │  pgvector    │ │ MCP Servers  │
+│ (Callbacks)  │ │  + RAG       │ │ (SSE/STDIO)  │
+└──────────────┘ └──────────────┘ └──────────────┘
+```
+
+## ReAct 执行流程
+
+1. **创建会话**: POST /agent/react/session/new → 返回 `conversationId`
+2. **发送消息**: POST /agent/react/session/{id}/message
+   - Agent 进入 ReAct 循环 (Reason → Act → Observe)
+   - 自动调用 Spring AI Tools / MCP Tools
+   - 达到 maxSteps 或 terminate 工具调用时终止
+3. **结果**: 返回 finalAnswer (最终答案)
+
+## 终止策略
+
+Agent 使用以下规则确保始终返回有效答案：
+
+1. **terminate 工具调用**: 如果 LLM 调用 `terminate(answer="xxx")`，直接返回 answer 作为 finalAnswer
+2. **直接文本回复**: 如果 LLM 未调用工具而直接输出内容，该内容作为 finalAnswer
+3. **maxSteps 达到**: 如果达到最大步数限制，返回 "达到最大步数，最后推理: {lastContent}"
+4. **空回复/重复**: 如果 LLM 连续返回空内容或重复，强制终止并返回降级答案
+
+## 配置
 ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
 │   Spring    │ │ Local Tools │ │  pgvector   │ │ MCP Servers │
 │ Statemachine│ │ + MCP Tools │ │ + Redis     │ │ (SSE/STDIO) │

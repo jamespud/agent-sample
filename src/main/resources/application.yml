@@ -35,8 +35,8 @@ spring:
         stdio:
           servers-configuration: classpath:mcp-servers-config.json
         type: sync
-
-
+    retry:
+      max-attempts: 1
   # ====================== Data Sources ======================
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/agent}

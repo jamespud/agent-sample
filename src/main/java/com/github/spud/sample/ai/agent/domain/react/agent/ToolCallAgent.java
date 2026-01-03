@@ -7,6 +7,7 @@ import com.github.spud.sample.ai.agent.domain.tools.ToolRegistry;
 import com.github.spud.sample.ai.agent.infrastructure.util.JsonUtils;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
@@ -22,6 +23,7 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
@@ -72,21 +74,19 @@ public class ToolCallAgent extends ReActAgent {
           promptMessages.addAll(this.messages);
         }
 
-        Prompt prompt = new Prompt(promptMessages);
-
-        // Call LLM with tools (unless toolChoice is NONE)
+        // Call LLM with Prompt that disables automatic tool execution
+        // Key: use ChatClient.prompt().call() but WITHOUT .toolCallbacks()
+        // This way we get tool_calls in response but Spring AI doesn't execute them
         ChatResponse chatResponse;
         try {
           log.debug("Calling chat client in think() with {} messages", promptMessages.size());
-          ChatClientRequestSpec requestSpec = this.chatClient.prompt(prompt);
-          if (this.toolChoice != ToolChoice.NONE) {
-            // Use injected callbacks if available, otherwise fallback to toolRegistry
-            List<ToolCallback> callbacks = !availableCallbacks.isEmpty() 
-              ? availableCallbacks 
-              : new ArrayList<>(toolRegistry.getAllCallbacks());
-            requestSpec.toolCallbacks(callbacks);
-          }
-          chatResponse = requestSpec.call().chatResponse();
+          
+          // Create Prompt with messages only, NO tool options
+          Prompt prompt = new Prompt(promptMessages);
+          
+          // CRITICAL: Use .call().chatResponse() instead of .stream() or .content()
+          // This prevents ChatClient from auto-executing tools
+          chatResponse = this.chatClient.prompt(prompt).call().chatResponse();
         } catch (Exception e) {
           log.error("Error calling chat client during think(): {}", e.getMessage(), e);
           throw e;
