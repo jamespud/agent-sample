@@ -7,14 +7,12 @@ import com.github.spud.sample.ai.agent.domain.tools.ToolRegistry;
 import com.github.spud.sample.ai.agent.infrastructure.util.JsonUtils;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.AssistantMessage.ToolCall;
 import org.springframework.ai.chat.messages.Message;
@@ -23,7 +21,6 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
@@ -80,10 +77,10 @@ public class ToolCallAgent extends ReActAgent {
         ChatResponse chatResponse;
         try {
           log.debug("Calling chat client in think() with {} messages", promptMessages.size());
-          
+
           // Create Prompt with messages only, NO tool options
           Prompt prompt = new Prompt(promptMessages);
-          
+
           // CRITICAL: Use .call().chatResponse() instead of .stream() or .content()
           // This prevents ChatClient from auto-executing tools
           chatResponse = this.chatClient.prompt(prompt).call().chatResponse();
@@ -120,7 +117,9 @@ public class ToolCallAgent extends ReActAgent {
           content.length(), this.pendingToolCalls.size());
 
         if (this.toolChoice.equals(ToolChoice.REQUIRED) && this.pendingToolCalls.isEmpty()) {
-          return true;
+          log.warn("ToolChoice.REQUIRED but no tool calls in response, injecting correction prompt");
+          this.messages.add(new SystemMessage(NO_TOOL_CALLS_CORRECTION_PROMPT));
+          return false; // Stay in THINK (will retry next step)
         }
 
         if (this.toolChoice.equals(ToolChoice.AUTO) && this.pendingToolCalls.isEmpty()) {
@@ -229,14 +228,14 @@ public class ToolCallAgent extends ReActAgent {
 
     // Find callback from available callbacks first, then fallback to toolRegistry
     ToolCallback callback = null;
-    
+
     if (!availableCallbacks.isEmpty()) {
       callback = availableCallbacks.stream()
         .filter(cb -> cb.getToolDefinition().name().equals(toolCall.name()))
         .findFirst()
         .orElse(null);
     }
-    
+
     if (callback == null) {
       callback = toolRegistry.getCallback(toolCall.name())
         .orElseThrow(() -> new IllegalArgumentException(

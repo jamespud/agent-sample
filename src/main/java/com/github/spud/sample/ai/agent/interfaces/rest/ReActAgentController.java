@@ -2,6 +2,7 @@ package com.github.spud.sample.ai.agent.interfaces.rest;
 
 import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
 import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService;
+import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.CreateAgentRequest;
 import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.CreateSessionRequest;
 import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.SendMessageResponse;
 import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.SessionNotFoundException;
@@ -34,6 +35,33 @@ public class ReActAgentController {
   private final ReActSessionService sessionService;
 
   /**
+   * Create a new Agent configuration
+   */
+  @PostMapping("/agent/new")
+  public Mono<ResponseEntity<CreateAgentResponse>> createAgent(
+    @RequestBody CreateAgentRequestDto request
+  ) {
+    return Mono.fromCallable(() -> {
+        log.info("Creating agent: agentType={}", request.getAgentType());
+
+        CreateAgentRequest serviceRequest = new CreateAgentRequest();
+        serviceRequest.setAgentType(request.getAgentType());
+        serviceRequest.setModelProvider(request.getModelProvider());
+        serviceRequest.setMaxSteps(request.getMaxSteps());
+        serviceRequest.setToolChoice(request.getToolChoice());
+
+        String agentId = sessionService.createAgent(serviceRequest);
+
+        return ResponseEntity.ok(new CreateAgentResponse(agentId));
+      })
+      .subscribeOn(Schedulers.boundedElastic())
+      .onErrorResume(e -> {
+        log.error("Failed to create agent", e);
+        return Mono.just(ResponseEntity.badRequest().build());
+      });
+  }
+
+  /**
    * 发起一个新的 ReAct 会话
    */
   @PostMapping("/session/new")
@@ -41,9 +69,10 @@ public class ReActAgentController {
     @RequestBody CreateSessionRequestDto request
   ) {
     return Mono.fromCallable(() -> {
-        log.info("Creating session: agentType={}", request.getAgentType());
+        log.info("Creating session: agentId={}, agentType={}", request.getAgentId(), request.getAgentType());
 
         CreateSessionRequest serviceRequest = new CreateSessionRequest();
+        serviceRequest.setAgentId(request.getAgentId());
         serviceRequest.setAgentType(request.getAgentType());
         serviceRequest.setModelProvider(request.getModelProvider());
         serviceRequest.setMaxSteps(request.getMaxSteps());
@@ -106,8 +135,25 @@ public class ReActAgentController {
   // ===== DTOs =====
 
   @Data
+  public static class CreateAgentRequestDto {
+
+    private ReActAgentType agentType;
+    private String modelProvider;
+    private Integer maxSteps;
+    private String toolChoice;
+  }
+
+  @Data
+  @AllArgsConstructor
+  public static class CreateAgentResponse {
+
+    private String agentId;
+  }
+
+  @Data
   public static class CreateSessionRequestDto {
 
+    private String agentId;
     private ReActAgentType agentType;
     private String modelProvider;
     private Integer maxSteps;

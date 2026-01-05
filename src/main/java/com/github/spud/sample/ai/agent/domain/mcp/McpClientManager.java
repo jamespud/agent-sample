@@ -16,9 +16,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * MCP 客户端管理器（增强版） 支持多服务器、生命周期管理、健康检查
- * 
- * Note: MCP tools are NOT registered to ToolRegistry. They are dynamically injected
- * into McpAgent only.
+ * <p>
+ * Note: MCP tools are NOT registered to ToolRegistry. They are dynamically injected into McpAgent
+ * only.
  */
 @Slf4j
 @Component

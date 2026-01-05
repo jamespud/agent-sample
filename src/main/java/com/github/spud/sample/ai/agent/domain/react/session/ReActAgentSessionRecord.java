@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 public class ReActAgentSessionRecord {
 
   private String conversationId;
+  private String agentId;
   private ReActAgentType agentType;
   private String modelProvider;
   private String systemPrompt;
@@ -29,6 +30,7 @@ public class ReActAgentSessionRecord {
   public ReActAgentSession toEntity() {
     ReActAgentSession entity = new ReActAgentSession();
     entity.setConversationId(this.conversationId);
+    entity.setAgentId(this.agentId);
     entity.setAgentType(this.agentType);
     entity.setModelProvider(this.modelProvider);
     entity.setSystemPrompt(this.systemPrompt);

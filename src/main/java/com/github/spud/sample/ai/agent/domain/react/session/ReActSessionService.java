@@ -3,11 +3,12 @@ package com.github.spud.sample.ai.agent.domain.react.session;
 import com.github.spud.sample.ai.agent.domain.react.agent.BaseAgent;
 import com.github.spud.sample.ai.agent.domain.react.message.AgentMessage;
 import com.github.spud.sample.ai.agent.domain.react.message.AgentMessageMapper;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentConfig;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentMessage;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
+import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentConfigRepository;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentMessageRepository;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentSessionRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReActSessionService {
 
+  private final ReActAgentConfigRepository agentConfigRepository;
   private final ReActAgentSessionRepository sessionRepository;
   private final ReActAgentMessageRepository messageRepository;
   private final ReActAgentFactory agentFactory;
@@ -34,38 +36,80 @@ public class ReActSessionService {
   private final AgentMessageMapper messageMapper;
 
   /**
+   * Create a new agent configuration
+   */
+  @Transactional
+  public String createAgent(CreateAgentRequest req) {
+    String agentId = UUID.randomUUID().toString();
+
+    ReActAgentConfig agent = new ReActAgentConfig();
+    agent.setAgentId(agentId);
+    agent.setAgentType(req.getAgentType());
+    agent.setModelProvider(
+      req.getModelProvider() != null ? req.getModelProvider() : defaults.getModelProvider());
+    agent.setSystemPrompt(defaults.getSystemPrompt());
+    agent.setNextStepPrompt(defaults.getNextStepPrompt());
+    agent.setMaxSteps(req.getMaxSteps() != null ? req.getMaxSteps() : defaults.getMaxSteps());
+    agent.setDuplicateThreshold(defaults.getDuplicateThreshold());
+    agent.setToolChoice(
+      req.getToolChoice() != null ? req.getToolChoice() : defaults.getToolChoiceDefault());
+    agent.setStatus("ACTIVE");
+
+    agentConfigRepository.save(agent);
+
+    log.info("Created agent: agentId={}, agentType={}", agentId, req.getAgentType());
+    return agentId;
+  }
+
+  /**
    * Create a new session
    */
   @Transactional
   public String createSession(CreateSessionRequest req) {
     String conversationId = UUID.randomUUID().toString();
-    Instant now = Instant.now();
 
+    // Compatibility mode: if agentId not provided, create agent first
+    final String agentId;
+    if (req.getAgentId() == null) {
+      CreateAgentRequest agentReq = new CreateAgentRequest();
+      agentReq.setAgentType(req.getAgentType());
+      agentReq.setModelProvider(req.getModelProvider());
+      agentReq.setMaxSteps(req.getMaxSteps());
+      agentReq.setToolChoice(req.getToolChoice());
+      agentId = createAgent(agentReq);
+    } else {
+      agentId = req.getAgentId();
+    }
+
+    // Load agent configuration
+    ReActAgentConfig agent = agentConfigRepository.findByAgentId(agentId)
+      .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentId));
+
+    // Create session with agent configuration snapshot
     ReActAgentSession record = ReActAgentSessionRecord.builder()
       .conversationId(conversationId)
-      .agentType(req.getAgentType())
-      .modelProvider(
-        req.getModelProvider() != null ? req.getModelProvider() : defaults.getModelProvider())
-      .systemPrompt(defaults.getSystemPrompt())
-      .nextStepPrompt(defaults.getNextStepPrompt())
-      .maxSteps(req.getMaxSteps() != null ? req.getMaxSteps() : defaults.getMaxSteps())
-      .duplicateThreshold(defaults.getDuplicateThreshold())
-      .toolChoice(
-        req.getToolChoice() != null ? req.getToolChoice() : defaults.getToolChoiceDefault())
+      .agentId(agentId)
+      .agentType(agent.getAgentType())
+      .modelProvider(agent.getModelProvider())
+      .systemPrompt(agent.getSystemPrompt())
+      .nextStepPrompt(agent.getNextStepPrompt())
+      .maxSteps(agent.getMaxSteps())
+      .duplicateThreshold(agent.getDuplicateThreshold())
+      .toolChoice(agent.getToolChoice())
       .status(ReActSessionStatus.ACTIVE)
       .version(0)
       .build()
       .toEntity();
 
     List<String> enabledMcpServers = null;
-    if (req.getAgentType() == ReActAgentType.MCP && req.getEnabledMcpServers() != null) {
+    if (agent.getAgentType() == ReActAgentType.MCP && req.getEnabledMcpServers() != null) {
       enabledMcpServers = req.getEnabledMcpServers();
     }
 
     sessionRepository.create(record, enabledMcpServers);
 
-    log.info("Created session: conversationId={}, agentType={}", conversationId,
-      req.getAgentType());
+    log.info("Created session: conversationId={}, agentId={}, agentType={}", conversationId,
+      agentId, agent.getAgentType());
     return conversationId;
   }
 
@@ -139,8 +183,18 @@ public class ReActSessionService {
   }
 
   @Data
+  public static class CreateAgentRequest {
+
+    private ReActAgentType agentType;
+    private String modelProvider;
+    private Integer maxSteps;
+    private String toolChoice;
+  }
+
+  @Data
   public static class CreateSessionRequest {
 
+    private String agentId;
     private ReActAgentType agentType;
     private String modelProvider;
     private Integer maxSteps;

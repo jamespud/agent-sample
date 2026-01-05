@@ -57,7 +57,6 @@ spring:
 
   cache:
     type: redis
-
 # ====================== Application Config ======================
 app:
   model:
@@ -66,30 +65,12 @@ app:
   agent:
     max-steps: ${AGENT_MAX_STEPS:15}
     duplicate-threshold: ${AGENT_DUPLICATE_THRESHOLD:3}
-    empty-threshold: ${AGENT_EMPTY_THRESHOLD:2}
-    degrade-prefix: ${AGENT_DEGRADE_PREFIX:未查到相关数据，以下为直接回答：}
     system-prompt: |
       You are an intelligent AI agent. You can use tools to help answer questions.
       When you have gathered enough information, provide your final answer.
       If you need to stop, call the terminate tool with your final answer.
     next-step-prompt: |
       Based on the previous results, decide what to do next.
-
-  mcp:
-    servers:
-    #      - id: default
-    #        enabled: ${MCP_DEFAULT_ENABLED:false}
-    #        transport: ${MCP_DEFAULT_TRANSPORT:sse}
-    #        sse:
-    #          url: ${MCP_DEFAULT_SSE_URL:http://localhost:8000/sse}
-    #        stdio:
-    #          command: ${MCP_DEFAULT_STDIO_CMD:}
-    #          args: ${MCP_DEFAULT_STDIO_ARGS:}
-    #        refresh:
-    #          every-steps: 5
-    namespace:
-      enabled: true
-      separator: "__"
 
   rag:
     enabled: ${RAG_ENABLED:true}

@@ -1,41 +1,34 @@
 package com.github.spud.sample.ai.agent.infrastructure.persistence.entity;
 
 import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
-import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Agent configuration entity for agent lifecycle management
+ * Separates agent definition from session (conversation thread)
+ */
 @Getter
 @Setter
 @Entity
-@Table(name = "react_agent_session")
-public class ReActAgentSession {
+@Table(name = "react_agent")
+public class ReActAgentConfig {
 
   @Id
-  @Size(max = 255)
-  @Column(name = "conversation_id", nullable = false)
-  private String conversationId;
-
   @Size(max = 36)
-  @Column(name = "agent_id", length = 36)
+  @Column(name = "agent_id", nullable = false, length = 36)
   private String agentId;
 
   @NotNull
@@ -71,18 +64,7 @@ public class ReActAgentSession {
   @NotNull
   @ColumnDefault("'ACTIVE'")
   @Column(name = "status", nullable = false, length = 20)
-  @Enumerated(EnumType.STRING)
-  private ReActSessionStatus status = ReActSessionStatus.ACTIVE;
-
-  @OneToMany(fetch = FetchType.LAZY)
-  @OnDelete(action = OnDeleteAction.CASCADE)
-  @JoinColumn(name = "conversation_id", referencedColumnName = "conversation_id")
-  private List<ReActAgentMessage> messages;
-
-  @NotNull
-  @ColumnDefault("0")
-  @Column(name = "version", nullable = false)
-  private Integer version;
+  private String status = "ACTIVE";
 
   @ColumnDefault("now()")
   @CreationTimestamp
@@ -93,6 +75,4 @@ public class ReActAgentSession {
   @UpdateTimestamp
   @Column(name = "updated_at")
   private OffsetDateTime updatedAt;
-
-
 }
