@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.message;
+package com.github.spud.sample.ai.agent.domain.message;
 
 import java.time.OffsetDateTime;
 import java.util.Map;

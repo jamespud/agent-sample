@@ -1,12 +1,14 @@
 package com.github.spud.sample.ai.agent.interfaces.rest;
 
-import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.CreateAgentRequest;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.CreateSessionRequest;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.SendMessageResponse;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.SessionNotFoundException;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActSessionService.VersionConflictException;
+import com.github.spud.sample.ai.agent.domain.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.domain.session.ReActSessionService;
+import com.github.spud.sample.ai.agent.domain.session.ReActSessionService.CreateAgentRequest;
+import com.github.spud.sample.ai.agent.domain.session.ReActSessionService.CreateSessionRequest;
+import com.github.spud.sample.ai.agent.domain.session.ReActSessionService.SendMessageResponse;
+import com.github.spud.sample.ai.agent.domain.session.ReActSessionService.SessionNotFoundException;
+import com.github.spud.sample.ai.agent.domain.session.ReActSessionService.VersionConflictException;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,22 +38,28 @@ public class ReActAgentController {
   private final ReActSessionService sessionService;
 
   /**
-   * Create a new Agent configuration
+   * 创建一个新的 ReAct Agent
    */
   @PostMapping("/agent/new")
   public Mono<ResponseEntity<CreateAgentResponse>> createAgent(
-    @RequestBody CreateAgentRequestDto request
+    @Validated @RequestBody CreateAgentRequestDto request
   ) {
     return Mono.fromCallable(() -> {
         log.info("Creating agent: agentType={}", request.getAgentType());
 
-        CreateAgentRequest serviceRequest = new CreateAgentRequest();
-        serviceRequest.setAgentType(request.getAgentType());
-        serviceRequest.setModelProvider(request.getModelProvider());
-        serviceRequest.setMaxSteps(request.getMaxSteps());
-        serviceRequest.setToolChoice(request.getToolChoice());
+        CreateAgentRequest agentRequest = CreateAgentRequest.builder()
+          .name(request.getName())
+          .description(request.getDescription())
+          .duplicateThreshold(request.getDuplicateThreshold())
+          .modelProvider(request.getModelProvider())
+          .agentType(request.getAgentType())
+          .systemPrompt(request.getSystemPrompt())
+          .nextStepPrompt(request.getNextStepPrompt())
+          .maxSteps(request.getMaxSteps())
+          .toolChoice(request.getToolChoice())
+          .build();
 
-        String agentId = sessionService.createAgent(serviceRequest);
+        String agentId = sessionService.createAgent(agentRequest);
 
         return ResponseEntity.ok(new CreateAgentResponse(agentId));
       })
@@ -66,17 +75,13 @@ public class ReActAgentController {
    */
   @PostMapping("/session/new")
   public Mono<ResponseEntity<CreateSessionResponse>> createSession(
-    @RequestBody CreateSessionRequestDto request
+    @Validated @RequestBody CreateSessionRequestDto request
   ) {
     return Mono.fromCallable(() -> {
-        log.info("Creating session: agentId={}, agentType={}", request.getAgentId(), request.getAgentType());
+        log.info("Creating session: agentId={}", request.getAgentId());
 
         CreateSessionRequest serviceRequest = new CreateSessionRequest();
         serviceRequest.setAgentId(request.getAgentId());
-        serviceRequest.setAgentType(request.getAgentType());
-        serviceRequest.setModelProvider(request.getModelProvider());
-        serviceRequest.setMaxSteps(request.getMaxSteps());
-        serviceRequest.setToolChoice(request.getToolChoice());
         serviceRequest.setEnabledMcpServers(request.getEnabledMcpServers());
 
         String conversationId = sessionService.createSession(serviceRequest);
@@ -92,10 +97,8 @@ public class ReActAgentController {
 
   @GetMapping("/session/list")
   public Mono<ResponseEntity<List<String>>> listSessions() {
-    return Mono.fromCallable(() -> {
-      log.info("Listing all ReAct sessions");
-      return ResponseEntity.ok(List.of());
-    });
+    List<String> sessions = sessionService.listSessions();
+    return Mono.just(ResponseEntity.ok(sessions));
   }
 
   /**
@@ -104,20 +107,20 @@ public class ReActAgentController {
   @PostMapping("/session/{conversationId}/messages")
   public Mono<ResponseEntity<SendMessageResponse>> sendMessage(
     @PathVariable String conversationId,
-    @RequestBody SendMessageRequestDto request
+    @Validated @RequestBody SendMessageRequestDto request
   ) {
     return Mono.fromCallable(() -> {
         log.info("Sending message to conversationId={}, content length={}",
           conversationId, request.getContent() != null ? request.getContent().length() : 0);
 
-        SendMessageResponse response = sessionService.sendMessage(
+        return sessionService.sendMessage(
           conversationId,
           request.getContent()
         );
-
-        return ResponseEntity.ok(response);
       })
       .subscribeOn(Schedulers.boundedElastic())
+      .flatMap(Mono::fromFuture)
+      .map(ResponseEntity::ok)
       .onErrorResume(SessionNotFoundException.class, e -> {
         log.warn("Session not found: {}", conversationId);
         return Mono.just(ResponseEntity.notFound().build());
@@ -137,8 +140,18 @@ public class ReActAgentController {
   @Data
   public static class CreateAgentRequestDto {
 
+    @NotBlank(message = "Name is required")
+    private String name;
+
+    @NotBlank(message = "Description is required")
+    private String description;
+    private Integer duplicateThreshold;
+
+    @NotNull
     private ReActAgentType agentType;
     private String modelProvider;
+    private String systemPrompt;
+    private String nextStepPrompt;
     private Integer maxSteps;
     private String toolChoice;
   }
@@ -154,10 +167,6 @@ public class ReActAgentController {
   public static class CreateSessionRequestDto {
 
     private String agentId;
-    private ReActAgentType agentType;
-    private String modelProvider;
-    private Integer maxSteps;
-    private String toolChoice;
     private List<String> enabledMcpServers;
   }
 

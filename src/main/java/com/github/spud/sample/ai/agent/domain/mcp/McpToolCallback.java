@@ -6,7 +6,7 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 
 /**
  * ToolCallback wrapper for MCP tools
- * 
+ * <p>
  * This wraps MCP client tool with a renamed ToolDefinition (mcp.<serverId>.<toolName>)
  * and delegates execution to the original callback from McpToolUtils
  */

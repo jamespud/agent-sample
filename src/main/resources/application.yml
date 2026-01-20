@@ -7,6 +7,7 @@ spring:
     openai:
       api-key: ${OPENAI_API_KEY:sk-placeholder}
       base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      timeout: ${OPENAI_TIMEOUT:60000ms}
       chat:
         options:
           model: ${OPENAI_CHAT_MODEL:gpt-4o}
@@ -18,6 +19,7 @@ spring:
         embeddings-path: /embeddings/multimodal
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      timeout: ${OLLAMA_TIMEOUT:60000ms}
       chat:
         options:
           model: ${OLLAMA_CHAT_MODEL:llama3}
@@ -36,7 +38,11 @@ spring:
           servers-configuration: classpath:mcp-servers-config.json
         type: sync
     retry:
-      max-attempts: 1
+      max-attempts: 3
+      backoff:
+        initial-interval: 1000ms
+        max-interval: 5000ms
+        multiplier: 2
   # ====================== Data Sources ======================
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/agent}
@@ -54,6 +60,13 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:3000ms}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:20}
+          max-idle: ${REDIS_POOL_MAX_IDLE:10}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
 
   cache:
     type: redis
@@ -67,8 +80,10 @@ app:
     duplicate-threshold: ${AGENT_DUPLICATE_THRESHOLD:3}
     system-prompt: |
       You are an intelligent AI agent. You can use tools to help answer questions.
-      When you have gathered enough information, provide your final answer.
-      If you need to stop, call the terminate tool with your final answer.
+      When you have gathered enough information, you MUST call the terminate tool with your final answer.
+      Do NOT provide any final answer without calling the terminate tool.
+      The terminate tool's input should be a JSON string with an "answer" field.
+      Example of calling terminate tool: {"toolcall":[{"thought":"I have found the answer","name":"terminate","arguments":{"answer":"Your final answer here"}}]}
     next-step-prompt: |
       Based on the previous results, decide what to do next.
 

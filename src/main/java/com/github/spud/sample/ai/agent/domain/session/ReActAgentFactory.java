@@ -1,6 +1,6 @@
-package com.github.spud.sample.ai.agent.domain.react.session;
+package com.github.spud.sample.ai.agent.domain.session;
 
-import com.github.spud.sample.ai.agent.domain.react.agent.ReActAgent;
+import com.github.spud.sample.ai.agent.domain.agent.ReActAgent;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
 import java.util.List;
 import org.springframework.ai.chat.messages.AbstractMessage;

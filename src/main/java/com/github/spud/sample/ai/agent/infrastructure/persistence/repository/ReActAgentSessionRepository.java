@@ -36,4 +36,7 @@ public interface ReActAgentSessionRepository extends JpaRepository<ReActAgentSes
   @Query("UPDATE ReActAgentSession SET version = version + 1 WHERE conversationId = :conversationId AND version = :expectedVersion")
   Integer tryBumpVersion(String conversationId, int expectedVersion);
 
+  @Query("SELECT distinct r.conversationId FROM ReActAgentSession r")
+  List<String> listAllConversationIds();
+
 }

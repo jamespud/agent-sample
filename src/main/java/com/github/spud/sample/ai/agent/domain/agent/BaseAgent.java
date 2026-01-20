@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.agent;
+package com.github.spud.sample.ai.agent.domain.agent;
 
 import com.github.spud.sample.ai.agent.domain.state.AgentState;
 import java.util.ArrayList;
@@ -90,7 +90,7 @@ public abstract class BaseAgent {
             log.info("Agent already finished, skipping step {}", i);
             return Mono.empty();
           }
-          
+
           this.currentStep = i;
           log.info("Executing step {}/{}", this.currentStep, this.maxSteps);
           return this.step()
@@ -101,6 +101,10 @@ public abstract class BaseAgent {
               results.add("Step " + this.currentStep + ": " + stepResult);
             })
             .onErrorResume(e -> {
+              // If the error is fatal, rethrow to abort the run. Otherwise record and continue.
+              if (e instanceof FatalAgentException) {
+                return Mono.error(e);
+              }
               results.add("Step " + this.currentStep + ": Error - " + e.getMessage());
               return Mono.empty();
             });

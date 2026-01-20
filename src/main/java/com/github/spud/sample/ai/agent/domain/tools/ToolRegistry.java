@@ -1,6 +1,9 @@
 package com.github.spud.sample.ai.agent.domain.tools;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -8,13 +11,17 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.resolution.ToolCallbackResolver;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
  * 统一工具注册中心 支持本地工具与 MCP 远程工具的统一注册与解析
  */
 @Slf4j
-@Component
+@Order(Ordered.LOWEST_PRECEDENCE)
+@Component()
 public class ToolRegistry {
 
   /**
@@ -26,6 +33,19 @@ public class ToolRegistry {
    * 工具名 -> ToolDefinition
    */
   private final Map<String, ToolDefinition> definitionMap = new ConcurrentHashMap<>();
+
+  @Resource
+  private List<ToolCallback> toolCallbacks;
+
+  /**
+   * 初始化注册工具
+   */
+  @PostConstruct
+  public void init() {
+    for (ToolCallback toolCallback : toolCallbacks) {
+      register(toolCallback);
+    }
+  }
 
   /**
    * 注册工具

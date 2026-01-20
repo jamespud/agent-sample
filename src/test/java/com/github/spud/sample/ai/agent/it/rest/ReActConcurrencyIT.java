@@ -3,11 +3,9 @@ package com.github.spud.sample.ai.agent.it.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.domain.session.ReActAgentType;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentMessageRepository;
-import com.github.spud.sample.ai.agent.interfaces.rest.ReActAgentController.CreateSessionRequestDto;
-import com.github.spud.sample.ai.agent.interfaces.rest.ReActAgentController.CreateSessionResponse;
-import com.github.spud.sample.ai.agent.interfaces.rest.ReActAgentController.SendMessageRequestDto;
+import com.github.spud.sample.ai.agent.interfaces.rest.ReActAgentController;
 import com.github.spud.sample.ai.agent.it.support.ContainersSupport;
 import com.github.spud.sample.ai.agent.it.support.OpenAiMockSupport;
 import java.time.Duration;
@@ -112,16 +110,35 @@ class ReActConcurrencyIT extends ContainersSupport {
   }
 
   private String createToolCallSession(int maxSteps) {
-    CreateSessionRequestDto request = new CreateSessionRequestDto();
-    request.setAgentType(ReActAgentType.TOOLCALL);
-    request.setMaxSteps(maxSteps);
+    // Step 1: Create agent
+    ReActAgentController.CreateAgentRequestDto createAgentRequest = new ReActAgentController.CreateAgentRequestDto();
+    createAgentRequest.setName("Concurrent Test Agent");
+    createAgentRequest.setDescription("Agent for concurrent testing");
+    createAgentRequest.setAgentType(ReActAgentType.TOOLCALL);
+    createAgentRequest.setMaxSteps(maxSteps);
 
-    CreateSessionResponse response = webTestClient.post()
-      .uri("/agent/react/session/new")
-      .bodyValue(request)
+    ReActAgentController.CreateAgentResponse agentResp = webTestClient.post()
+      .uri("/agent/react/agent/new")
+      .bodyValue(createAgentRequest)
       .exchange()
       .expectStatus().isOk()
-      .expectBody(CreateSessionResponse.class)
+      .expectBody(ReActAgentController.CreateAgentResponse.class)
+      .returnResult()
+      .getResponseBody();
+
+    assertThat(agentResp).isNotNull();
+    assertThat(agentResp.getAgentId()).isNotEmpty();
+
+    // Step 2: Create session
+    ReActAgentController.CreateSessionRequestDto createSessionRequest = new ReActAgentController.CreateSessionRequestDto();
+    createSessionRequest.setAgentId(agentResp.getAgentId());
+
+    ReActAgentController.CreateSessionResponse response = webTestClient.post()
+      .uri("/agent/react/session/new")
+      .bodyValue(createSessionRequest)
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody(ReActAgentController.CreateSessionResponse.class)
       .returnResult()
       .getResponseBody();
 
@@ -131,7 +148,7 @@ class ReActConcurrencyIT extends ContainersSupport {
 
   private void sendMessageExpectingStatus(String conversationId, String content,
     HttpStatus expectedStatus) {
-    SendMessageRequestDto request = new SendMessageRequestDto();
+    ReActAgentController.SendMessageRequestDto request = new ReActAgentController.SendMessageRequestDto();
     request.setContent(content);
 
     webTestClient.post()

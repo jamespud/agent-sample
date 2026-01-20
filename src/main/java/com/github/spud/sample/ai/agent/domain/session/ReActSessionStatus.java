@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.session;
+package com.github.spud.sample.ai.agent.domain.session;
 
 /**
  * React session status enum

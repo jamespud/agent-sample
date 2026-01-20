@@ -1,9 +1,9 @@
-package com.github.spud.sample.ai.agent.domain.react.session;
+package com.github.spud.sample.ai.agent.domain.session;
 
 import com.github.spud.sample.ai.agent.domain.mcp.McpClientManager;
-import com.github.spud.sample.ai.agent.domain.react.agent.McpAgent;
-import com.github.spud.sample.ai.agent.domain.react.agent.ReActAgent;
-import com.github.spud.sample.ai.agent.domain.react.agent.ToolCallAgent;
+import com.github.spud.sample.ai.agent.domain.agent.McpAgent;
+import com.github.spud.sample.ai.agent.domain.agent.ReActAgent;
+import com.github.spud.sample.ai.agent.domain.agent.ToolCallAgent;
 import com.github.spud.sample.ai.agent.domain.state.ToolChoice;
 import com.github.spud.sample.ai.agent.domain.tools.ToolRegistry;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AbstractMessage;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 
 /**
@@ -39,8 +40,13 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
     switch (session.getAgentType()) {
       case TOOLCALL:
         // ToolAgent only uses local tools from ToolRegistry
+        java.util.List<ToolCallback> callbacks = new java.util.ArrayList<>();
+        if (session.getEnabledToolNames() != null) {
+          session.getEnabledToolNames().forEach(name -> toolRegistry.getCallback(name).ifPresent(callbacks::add));
+        }
+
         ToolCallAgent toolAgent = ToolCallAgent.builder()
-          .name("react-toolcall-" + session.getConversationId())
+          .name("react-tool_call-" + session.getConversationId())
           .description("React tool-calling agent")
           .systemPrompt(session.getSystemPrompt())
           .nextStepPrompt(session.getNextStepPrompt())
@@ -49,11 +55,9 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
           .messages(historyMessages)
           .maxSteps(session.getMaxSteps())
           .duplicateThreshold(session.getDuplicateThreshold())
-          .toolRegistry(toolRegistry)
+          .availableCallbacks(callbacks)
           .build();
-        
-        // Explicitly set availableCallbacks to empty, will fall back to toolRegistry
-        // This ensures ToolAgent boundary is enforced
+
         return toolAgent;
 
       case MCP:

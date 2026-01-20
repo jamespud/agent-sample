@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.agent;
+package com.github.spud.sample.ai.agent.domain.agent;
 
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Mono;
@@ -11,7 +11,7 @@ public abstract class ReActAgent extends BaseAgent {
   protected abstract Mono<String> act();
 
   @Override
-  protected Mono<String> step() {
+  protected final Mono<String> step() {
     return this.think()
       .defaultIfEmpty(false)
       .flatMap(shouldAct -> {

@@ -2,7 +2,7 @@ package com.github.spud.sample.ai.agent.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.domain.session.ReActAgentType;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentMessageRepository;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.repository.ReActAgentSessionRepository;
 import com.github.spud.sample.ai.agent.interfaces.rest.ReActAgentController;
@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -25,6 +26,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 @AutoConfigureWebTestClient
 @ActiveProfiles("test")
 @Import(ReActAgentTestConfig.class)
+@EnableAutoConfiguration(exclude = org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration.class)
 class ReActAgentControllerTest {
 
   @Autowired
@@ -38,19 +40,39 @@ class ReActAgentControllerTest {
 
   @Test
   void shouldCreateToolCallSessionAndSendMessage() {
-    // Create session
-    String requestBody = """
+    // Create agent first
+    String createAgentBody = """
       {
+        "name": "Test Agent",
+        "description": "Test Description",
         "agentType": "TOOLCALL",
         "modelProvider": "openai",
         "maxSteps": 10
       }
       """;
 
+    String agentId = webTestClient.post()
+      .uri("/agent/react/agent/new")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createAgentBody)
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody(ReActAgentController.CreateAgentResponse.class)
+      .returnResult()
+      .getResponseBody()
+      .getAgentId();
+
+    // Create session
+    String createSessionBody = """
+      {
+        "agentId": "%s"
+      }
+      """.formatted(agentId);
+
     String conversationId = webTestClient.post()
       .uri("/agent/react/session/new")
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(requestBody)
+      .bodyValue(createSessionBody)
       .exchange()
       .expectStatus().isOk()
       .expectBody(ReActAgentController.CreateSessionResponse.class)
@@ -61,7 +83,7 @@ class ReActAgentControllerTest {
     // Verify session exists in DB
     var session = sessionRepository.findByConversationId(conversationId);
     assertThat(session).isPresent();
-    assertThat(session.get().getAgentType()).isEqualTo(ReActAgentType.TOOLCALL);
+    assertThat(session.get().getAgentId()).isEqualTo(agentId);
 
     // Send message
     String messageBody = """
@@ -91,18 +113,38 @@ class ReActAgentControllerTest {
 
   @Test
   void shouldCreateMcpSessionWithEnabledServers() {
-    // Create MCP session with enabled servers
-    String requestBody = """
+    // Create agent first
+    String createAgentBody = """
       {
-        "agentType": "MCP",
-        "enabledMcpServers": ["server1", "server2"]
+        "name": "MCP Agent",
+        "description": "MCP Agent Description",
+        "agentType": "MCP"
       }
       """;
+
+    String agentId = webTestClient.post()
+      .uri("/agent/react/agent/new")
+      .contentType(MediaType.APPLICATION_JSON)
+      .bodyValue(createAgentBody)
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody(ReActAgentController.CreateAgentResponse.class)
+      .returnResult()
+      .getResponseBody()
+      .getAgentId();
+
+    // Create MCP session with enabled servers
+    String createSessionBody = """
+      {
+        "agentId": "%s",
+        "enabledMcpServers": ["server1", "server2"]
+      }
+      """.formatted(agentId);
 
     String conversationId = webTestClient.post()
       .uri("/agent/react/session/new")
       .contentType(MediaType.APPLICATION_JSON)
-      .bodyValue(requestBody)
+      .bodyValue(createSessionBody)
       .exchange()
       .expectStatus().isOk()
       .expectBody(ReActAgentController.CreateSessionResponse.class)

@@ -1,7 +1,7 @@
 package com.github.spud.sample.ai.agent.react;
 
-import com.github.spud.sample.ai.agent.domain.react.agent.ReActAgent;
-import com.github.spud.sample.ai.agent.domain.react.session.ReActAgentFactory;
+import com.github.spud.sample.ai.agent.domain.agent.ReActAgent;
+import com.github.spud.sample.ai.agent.domain.session.ReActAgentFactory;
 import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
 import java.util.Collections;
 import java.util.List;
@@ -73,11 +73,6 @@ public class ReActAgentTestConfig {
 
     @Override
     protected Mono<String> act() {
-      return null;
-    }
-
-    @Override
-    protected Mono<String> step() {
       return null;
     }
   }

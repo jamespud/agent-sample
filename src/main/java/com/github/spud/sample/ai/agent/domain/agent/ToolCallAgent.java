@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.agent;
+package com.github.spud.sample.ai.agent.domain.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.spud.sample.ai.agent.domain.state.AgentState;
@@ -31,6 +31,7 @@ import reactor.core.publisher.Mono;
 public class ToolCallAgent extends ReActAgent {
 
   private static final String TERMINATE_TOOL_NAME = "terminate";
+  private static final String DEFAULT_FALLBACK_TOOL = "echo";
   private static final String NO_TOOL_CALLS_CORRECTION_PROMPT =
     """
       【重要】你上一轮的输出没有包含工具调用。请注意：
@@ -38,10 +39,8 @@ public class ToolCallAgent extends ReActAgent {
       2. 必须通过调用 terminate 工具来结束任务
       3. terminate 工具的参数格式：{"answer": "你的最终答案"}
       4. 只需要一次 terminate 调用即可完成任务
-      
-      请重新思考并使用工具调用（tool calls）来完成任务。""";
 
-  protected final ToolRegistry toolRegistry;
+      请重新思考并使用工具调用（tool calls）来完成任务.""";
 
   @Builder.Default
   private ToolChoice toolChoice = ToolChoice.AUTO;
@@ -55,7 +54,7 @@ public class ToolCallAgent extends ReActAgent {
   protected List<ToolCallback> availableCallbacks = new ArrayList<>();
 
   @Override
-  protected Mono<Boolean> think() {
+  public Mono<Boolean> think() {
     return Mono.fromCallable(() -> {
         // Add next step prompt if provided
         if (StringUtils.hasText(this.nextStepPrompt)) {
@@ -83,7 +82,7 @@ public class ToolCallAgent extends ReActAgent {
 
           // CRITICAL: Use .call().chatResponse() instead of .stream() or .content()
           // This prevents ChatClient from auto-executing tools
-          chatResponse = this.chatClient.prompt(prompt).call().chatResponse();
+          chatResponse = this.chatClient.prompt(prompt).toolCallbacks(new ArrayList<>(this.availableCallbacks)).call().chatResponse();
         } catch (Exception e) {
           log.error("Error calling chat client during think(): {}", e.getMessage(), e);
           throw e;
@@ -113,6 +112,7 @@ public class ToolCallAgent extends ReActAgent {
         List<ToolCall> toolCalls = assistantMessage.getToolCalls();
         this.pendingToolCalls = !toolCalls.isEmpty() ? new ArrayList<>(toolCalls) : new ArrayList<>();
 
+        log.debug("content: {}", content);
         log.info("Think phase complete: content length={}, tool_calls={}",
           content.length(), this.pendingToolCalls.size());
 
@@ -123,7 +123,14 @@ public class ToolCallAgent extends ReActAgent {
         }
 
         if (this.toolChoice.equals(ToolChoice.AUTO) && this.pendingToolCalls.isEmpty()) {
-          return StringUtils.hasText(content);
+          // Only consider task complete if terminate tool is called
+          boolean hasTerminateToolCall = !toolCalls.isEmpty() && toolCalls.stream().anyMatch(tc -> tc.name().equals("terminate"));
+          if (hasTerminateToolCall) {
+            return true;
+          } else {
+            log.warn("AUTO tool choice but no terminate tool call. Task not complete.");
+            return false;
+          }
         }
 
         // Decide whether to ACT
@@ -222,24 +229,29 @@ public class ToolCallAgent extends ReActAgent {
    * Execute a single tool call using ToolCallback
    */
   private String executeToolCall(ToolCall toolCall) {
-    if (!StringUtils.hasText(toolCall.name())) {
-      throw new IllegalArgumentException("Tool call name is empty");
+    String requestedName = toolCall.name();
+
+    // If tool name is empty, attempt fallback
+    if (!StringUtils.hasText(requestedName)) {
+      log.warn("Tool call with empty name received; attempting fallback to {}", DEFAULT_FALLBACK_TOOL);
+      requestedName = DEFAULT_FALLBACK_TOOL;
     }
 
     // Find callback from available callbacks first, then fallback to toolRegistry
     ToolCallback callback = null;
 
     if (!availableCallbacks.isEmpty()) {
+      final String matchName = requestedName;
       callback = availableCallbacks.stream()
-        .filter(cb -> cb.getToolDefinition().name().equals(toolCall.name()))
+        .filter(cb -> cb.getToolDefinition().name().equals(matchName))
         .findFirst()
         .orElse(null);
     }
 
     if (callback == null) {
-      callback = toolRegistry.getCallback(toolCall.name())
-        .orElseThrow(() -> new IllegalArgumentException(
-          "Unknown tool: " + toolCall.name()));
+      String msg = "Unknown tool: '" + toolCall.name() + "' and no fallback available";
+      log.error(msg);
+      throw new FatalAgentException(msg);
     }
 
     // Execute using callback

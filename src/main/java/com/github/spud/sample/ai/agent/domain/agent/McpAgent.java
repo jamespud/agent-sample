@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.agent;
+package com.github.spud.sample.ai.agent.domain.agent;
 
 import com.github.spud.sample.ai.agent.domain.mcp.McpClientManager;
 import com.github.spud.sample.ai.agent.domain.mcp.McpToolCallback;
@@ -10,7 +10,6 @@ import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.mcp.McpToolUtils;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Mono;
 
@@ -94,7 +93,7 @@ public class McpAgent extends ToolCallAgent {
   }
 
   @Override
-  protected Mono<Boolean> think() {
+  public Mono<Boolean> think() {
     return Mono.fromCallable(() -> {
       // Check if tools need refresh
       if (shouldRefreshTools()) {

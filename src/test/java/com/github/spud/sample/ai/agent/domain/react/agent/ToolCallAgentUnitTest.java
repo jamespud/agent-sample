@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.github.spud.sample.ai.agent.domain.agent.ToolCallAgent;
 import com.github.spud.sample.ai.agent.domain.state.AgentState;
 import com.github.spud.sample.ai.agent.domain.state.ToolChoice;
 import com.github.spud.sample.ai.agent.domain.tools.ToolRegistry;
@@ -315,7 +316,7 @@ class ToolCallAgentUnitTest {
     // Verify terminate was called and other_tool was NOT called
     assertThat(result).contains("Final answer");
     // Verify only terminate callback was invoked (not other_tool)
-    // Note: We can't directly verify mock invocations due to filterForTerminate, 
+    // Note: We can't directly verify mock invocations due to filterForTerminate,
     // but we can check that only one ToolResponseMessage was added
     long toolResponseCount = agent.getMessages().stream()
       .filter(m -> m instanceof org.springframework.ai.chat.messages.ToolResponseMessage)
@@ -336,6 +337,16 @@ class ToolCallAgentUnitTest {
     when(responseSpec.chatResponse()).thenReturn(chatResponse);
     when(toolRegistry.getCallback("unknown_tool"))
       .thenReturn(java.util.Optional.empty());
+
+    // Provide fallback 'echo' tool so the agent can recover
+    org.springframework.ai.tool.definition.ToolDefinition echoDef =
+      new org.springframework.ai.tool.definition.DefaultToolDefinition("echo",
+        "Echo tool", "{}");
+    ToolCallback echoCallback = mock(ToolCallback.class);
+    when(echoCallback.getToolDefinition()).thenReturn(echoDef);
+    when(echoCallback.call(any())).thenReturn("Echoed");
+    when(toolRegistry.getCallback("echo")).thenReturn(java.util.Optional.of(echoCallback));
+
     when(toolRegistry.getAllCallbacks()).thenReturn(List.of());
 
     ToolCallAgent agent = ToolCallAgent.builder()
@@ -349,21 +360,16 @@ class ToolCallAgentUnitTest {
 
     String result = agent.run("Test").block(Duration.ofSeconds(5));
 
-    // Should not throw exception and should contain error in result
+    // Should not throw exception and should contain fallback result
     assertThat(result).isNotNull();
-    assertThat(result).containsIgnoringCase("error");
+    assertThat(result).containsIgnoringCase("Echoed");
 
-    // Verify error ToolResponseMessage was added
-    boolean hasErrorToolResponse = agent.getMessages().stream()
+    // Verify ToolResponseMessage was added by fallback
+    boolean hasToolResponse = agent.getMessages().stream()
       .filter(m -> m instanceof org.springframework.ai.chat.messages.ToolResponseMessage)
-      .anyMatch(m -> {
-        org.springframework.ai.chat.messages.ToolResponseMessage trm =
-          (org.springframework.ai.chat.messages.ToolResponseMessage) m;
-        return trm.getResponses().stream()
-          .anyMatch(
-            r -> r.responseData().contains("Error") || r.responseData().contains("Unknown"));
-      });
-    assertThat(hasErrorToolResponse).isTrue();
+      .findAny()
+      .isPresent();
+    assertThat(hasToolResponse).isTrue();
   }
 
   @Test
@@ -407,5 +413,3 @@ class ToolCallAgentUnitTest {
     assertThat(result).containsAnyOf("Task completed", "error parsing");
   }
 }
-
-

@@ -1,4 +1,4 @@
-package com.github.spud.sample.ai.agent.domain.react.session;
+package com.github.spud.sample.ai.agent.domain.session;
 
 import com.github.spud.sample.ai.agent.infrastructure.persistence.entity.ReActAgentSession;
 import lombok.AllArgsConstructor;
@@ -26,6 +26,7 @@ public class ReActAgentSessionRecord {
   private String toolChoice;
   private ReActSessionStatus status;
   private Integer version;
+  private java.util.List<String> enabledToolNames;
 
   public ReActAgentSession toEntity() {
     ReActAgentSession entity = new ReActAgentSession();
@@ -40,6 +41,7 @@ public class ReActAgentSessionRecord {
     entity.setToolChoice(this.toolChoice);
     entity.setStatus(this.status);
     entity.setVersion(this.version);
+    entity.setEnabledToolNames(this.enabledToolNames);
     return entity;
   }
 }
