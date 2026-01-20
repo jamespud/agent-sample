@@ -1,5 +1,6 @@
 package com.github.spud.sample.ai.agent.domain.session;
 
+import com.github.spud.sample.ai.agent.application.config.MessageHistoryProperties;
 import com.github.spud.sample.ai.agent.domain.agent.BaseAgent;
 import com.github.spud.sample.ai.agent.domain.message.AgentMessage;
 import com.github.spud.sample.ai.agent.domain.message.AgentMessageMapper;
@@ -20,6 +21,7 @@ import org.springframework.ai.chat.messages.AbstractMessage;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
@@ -37,6 +39,9 @@ public class ReActSessionService {
   private final ReActAgentFactory agentFactory;
   private final ReActAgentDefaultsProperties defaults;
   private final AgentMessageMapper messageMapper;
+  private final TransactionTemplate transactionTemplate;
+  private final MessageHistoryProperties messageHistoryProperties;
+  private final com.github.spud.sample.ai.agent.domain.tools.ToolRegistry toolRegistry;
 
   public ReActAgentConfig mergeDefaults(CreateAgentRequest request) {
     ReActAgentConfig config = new ReActAgentConfig();
@@ -60,10 +65,8 @@ public class ReActSessionService {
 
   @Transactional
   public String defaultAgentId() {
-    // 查找是否有默认代理配置，如果没有则创建一个默认代理
-    return agentConfigRepository.findAll().stream()
-        .filter(config -> "ACTIVE".equals(config.getStatus()))
-        .findFirst()
+    // Find or create first active agent (optimized query instead of full table scan)
+    return agentConfigRepository.findFirstByStatusOrderByCreatedAtAsc(ReActAgentStatus.ACTIVE)
         .map(ReActAgentConfig::getAgentId)
         .orElseGet(() -> {
           log.warn("No active agent configuration found. Creating a default agent.");
@@ -113,20 +116,18 @@ public class ReActSessionService {
     ReActAgentConfig agent = agentConfigRepository.findByAgentId(agentId)
       .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentId));
 
-    // Parse enabled tools from agent config (JSON array of tool names)
-    java.util.List<String> enabledToolNames = null;
-    if (StringUtils.hasText(agent.getEnabledTools())) {
-      try {
-        var node = com.github.spud.sample.ai.agent.infrastructure.util.JsonUtils.readTree(agent.getEnabledTools());
-        if (node.isArray()) {
-          enabledToolNames = new java.util.ArrayList<>();
-          for (com.fasterxml.jackson.databind.JsonNode n : node) {
-            enabledToolNames.add(n.asText());
-          }
-        }
-      } catch (Exception e) {
-        log.warn("Invalid enabled_tools JSON for agent {}: {}", agentId, e.getMessage());
-      }
+    // Get enabled tools snapshot directly (now List<String> thanks to JSON mapping)
+    // If null, use all available tools from registry (prevents regression where NULL = no tools)
+    final java.util.List<String> enabledToolsSnapshot;
+    if (agent.getEnabledTools() == null || agent.getEnabledTools().isEmpty()) {
+      log.warn("Agent {} has no enabled_tools configured, using all available tools from registry", agentId);
+      java.util.List<String> allTools = new java.util.ArrayList<>();
+      // Get all tool names from registry (fallback for backward compatibility)
+      toolRegistry.getAllCallbacks().forEach(cb -> 
+        allTools.add(cb.getToolDefinition().name()));
+      enabledToolsSnapshot = allTools;
+    } else {
+      enabledToolsSnapshot = agent.getEnabledTools();
     }
 
     // Create session with agent configuration snapshot
@@ -140,13 +141,13 @@ public class ReActSessionService {
       .maxSteps(agent.getMaxSteps())
       .duplicateThreshold(agent.getDuplicateThreshold())
       .toolChoice(agent.getToolChoice())
-      .enabledToolNames(enabledToolNames)
+      .enabledToolsSnapshot(enabledToolsSnapshot)
       .status(ReActSessionStatus.ACTIVE)
       .version(0)
       .build()
       .toEntity();
 
-    log.debug("Session enabled tools: {}", enabledToolNames);
+    log.debug("Session enabled tools snapshot: {}", enabledToolsSnapshot);
 
     List<String> enabledMcpServers = null;
     if (agent.getAgentType() == ReActAgentType.MCP && req.getEnabledMcpServers() != null) {
@@ -165,87 +166,137 @@ public class ReActSessionService {
   }
 
   /**
-   * Send a message to an existing session
+   * Send a message to an existing session (reactive with transactional guarantee)
+   * Uses explicit transaction wrapper for message persistence on boundedElastic thread
    */
-  @Transactional
-  public java.util.concurrent.CompletableFuture<SendMessageResponse> sendMessage(String conversationId, String content) {
-    // Load session
-    ReActAgentSession session = sessionRepository.findByConversationId(conversationId)
-      .orElseThrow(() -> new SessionNotFoundException("Session not found: " + conversationId));
+  public Mono<SendMessageResponse> sendMessage(String conversationId, String content) {
+    // Step 1: Load and lock session (runs on HTTP thread with transaction context)
+    SessionData sessionData = loadSessionForProcessing(conversationId);
+    
+    // Step 2+3: Run agent async, then persist
+    return Mono.defer(() -> {
+      // Load history entities with configurable window size
+      List<ReActAgentMessage> historyEntities = messageRepository.listMessages(conversationId, 
+        messageHistoryProperties);
+      List<AgentMessage> historyDomains = messageMapper.toDomainList(historyEntities);
+      List<AbstractMessage> historyMessages = messageMapper.toSpringMessages(historyDomains);
 
-    // Serialize concurrent requests for same conversation (optimistic locking)
-    Integer versionBumped = sessionRepository.tryBumpVersion(conversationId, session.getVersion());
-    if (versionBumped != 1) {
-      throw new VersionConflictException(
-        "Concurrent modification detected for conversationId: " + conversationId);
+      int beforeSize = historyMessages.size();
+
+      // Create agent instance (new instance, not singleton)
+      BaseAgent agent = agentFactory.create(sessionData.session, historyMessages);
+
+      // Run agent asynchronously
+      return agent.run(content)
+        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+        .map(answer -> {
+          // Calculate appended messages by comparing sizes
+          List<AbstractMessage> appendedSpringMessages = historyMessages.subList(beforeSize,
+            historyMessages.size());
+
+          // Convert appended Spring messages back to domain, then to entities for persistence
+          List<AgentMessage> appendedDomains = appendedSpringMessages.stream()
+            .map(messageMapper::fromSpringMessage)
+            .collect(Collectors.toList());
+
+          List<ReActAgentMessage> appendedEntities = appendedDomains.stream()
+            .map(domain -> messageMapper.toEntity(domain, sessionData.session))
+            .collect(Collectors.toList());
+
+          // Persist messages - use syncPersistMessages for thread-safe transaction handling
+          syncPersistMessages(conversationId, appendedEntities);
+
+          // Determine if finished (check for terminate or finalAnswer presence)
+          boolean finished = answer != null && !answer.isEmpty();
+
+          log.info("Processed message: conversationId={}, appendedMessages={}, finished={}",
+            conversationId, appendedEntities.size(), finished);
+
+          return SendMessageResponse.builder()
+            .conversationId(conversationId)
+            .answer(answer)
+            .finished(finished)
+            .appendedMessages(toMessageDtos(appendedDomains))
+            .build();
+        })
+        .onErrorResume(ex -> {
+          // Ensure we persist any messages the agent appended before the failure
+          List<AbstractMessage> appendedSpringMessages = historyMessages.subList(beforeSize,
+            historyMessages.size());
+          List<AgentMessage> appendedDomains = appendedSpringMessages.stream()
+            .map(messageMapper::fromSpringMessage)
+            .collect(Collectors.toList());
+
+          List<ReActAgentMessage> appendedEntities = appendedDomains.stream()
+            .map(domain -> messageMapper.toEntity(domain, sessionData.session))
+            .collect(Collectors.toList());
+
+          if (!appendedEntities.isEmpty()) {
+            try {
+              syncPersistMessages(conversationId, appendedEntities);
+            } catch (Exception persistEx) {
+              log.error("Failed to persist messages after agent error", persistEx);
+            }
+          }
+
+          log.error("Agent run failed for conversationId={}: {}", conversationId, ex.getMessage(), ex);
+
+          return Mono.just(SendMessageResponse.builder()
+            .conversationId(conversationId)
+            .answer(ex.getMessage())
+            .finished(true)
+            .appendedMessages(toMessageDtos(appendedDomains))
+            .build());
+        });
+    });
+  }
+
+  /**
+   * Transactional boundary: Load session and bump version
+   * Uses TransactionTemplate to ensure transaction works on any thread
+   */
+  public SessionData loadSessionForProcessing(String conversationId) {
+    // Use TransactionTemplate to execute in a transaction regardless of thread
+    return transactionTemplate.execute(status -> {
+      // Load session
+      ReActAgentSession session = sessionRepository.findByConversationId(conversationId)
+        .orElseThrow(() -> new SessionNotFoundException("Session not found: " + conversationId));
+
+      // Serialize concurrent requests for same conversation (optimistic locking)
+      Integer versionBumped = sessionRepository.tryBumpVersion(conversationId, session.getVersion());
+      if (versionBumped != 1) {
+        throw new VersionConflictException(
+          "Concurrent modification detected for conversationId: " + conversationId);
+      }
+
+      return new SessionData(session);
+    });
+  }
+
+  /**
+   * Transactional boundary: Persist messages
+   * Uses TransactionTemplate to handle transactions from non-HTTP threads (e.g., boundedElastic)
+   * This is necessary because @Transactional uses thread-local context which doesn't work across reactor threads
+   * Public method to ensure it can be called from any context
+   */
+  public void syncPersistMessages(String conversationId, List<ReActAgentMessage> messages) {
+    if (!messages.isEmpty()) {
+      // Execute in a new transaction regardless of current thread
+      transactionTemplate.executeWithoutResult(status -> {
+        messageRepository.appendMessages(conversationId, messages);
+      });
     }
+  }
 
-    // Load history entities and convert to Spring AI messages
-    List<ReActAgentMessage> historyEntities = messageRepository.listMessages(conversationId);
-    List<AgentMessage> historyDomains = messageMapper.toDomainList(historyEntities);
-    List<AbstractMessage> historyMessages = messageMapper.toSpringMessages(historyDomains);
+  /**
+   * Helper class to pass session through reactive chain
+   */
+  private static class SessionData {
+    final ReActAgentSession session;
 
-    int beforeSize = historyMessages.size();
-
-    // Create agent instance (new instance, not singleton)
-    BaseAgent agent = agentFactory.create(session, historyMessages);
-
-    // Run agent (non-blocking)
-    return agent.run(content)
-      .map(answer -> {
-        // Calculate appended messages by comparing sizes
-        List<AbstractMessage> appendedSpringMessages = historyMessages.subList(beforeSize,
-          historyMessages.size());
-
-        // Convert appended Spring messages back to domain, then to entities for persistence
-        List<AgentMessage> appendedDomains = appendedSpringMessages.stream()
-          .map(messageMapper::fromSpringMessage)
-          .collect(Collectors.toList());
-
-        List<ReActAgentMessage> appendedEntities = appendedDomains.stream()
-          .map(domain -> messageMapper.toEntity(domain, session))
-          .collect(Collectors.toList());
-
-        messageRepository.appendMessages(conversationId, appendedEntities);
-
-        // Determine if finished (check for terminate or finalAnswer presence)
-        boolean finished = answer != null && !answer.isEmpty();
-
-        log.info("Processed message: conversationId={}, appendedMessages={}, finished={}",
-          conversationId, appendedEntities.size(), finished);
-
-        return SendMessageResponse.builder()
-          .conversationId(conversationId)
-          .answer(answer)
-          .finished(finished)
-          .appendedMessages(toMessageDtos(appendedDomains))
-          .build();
-      })
-      .onErrorResume(ex -> {
-        // Ensure we persist any messages the agent appended before the failure
-        List<AbstractMessage> appendedSpringMessages = historyMessages.subList(beforeSize, historyMessages.size());
-        List<AgentMessage> appendedDomains = appendedSpringMessages.stream()
-          .map(messageMapper::fromSpringMessage)
-          .collect(Collectors.toList());
-
-        List<ReActAgentMessage> appendedEntities = appendedDomains.stream()
-          .map(domain -> messageMapper.toEntity(domain, session))
-          .collect(Collectors.toList());
-
-        if (!appendedEntities.isEmpty()) {
-          messageRepository.appendMessages(conversationId, appendedEntities);
-        }
-
-        log.error("Agent run failed for conversationId={}: {}", conversationId, ex.getMessage(), ex);
-
-        return Mono.just(SendMessageResponse.builder()
-          .conversationId(conversationId)
-          .answer(ex.getMessage())
-          .finished(true)
-          .appendedMessages(toMessageDtos(appendedDomains))
-          .build());
-      })
-      .toFuture();
+    SessionData(ReActAgentSession session) {
+      this.session = session;
+    }
   }
 
   private List<MessageDto> toMessageDtos(List<AgentMessage> domains) {

@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
@@ -73,6 +74,10 @@ public class ReActAgentMessage {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "metadata", columnDefinition = "jsonb")
   private Map<String, Object> metadata;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "tool_calls", columnDefinition = "jsonb")
+  private List<Map<String, Object>> toolCalls;
 
   @ColumnDefault("now()")
   @CreationTimestamp

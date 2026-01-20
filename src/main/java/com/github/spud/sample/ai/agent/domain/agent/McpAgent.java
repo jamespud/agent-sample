@@ -85,8 +85,7 @@ public class McpAgent extends ToolCallAgent {
       mcpCallbacks.size(), enabledMcpServers.size());
 
     // Combine local tools (from toolRegistry) with MCP tools
-    List<ToolCallback> localCallbacks = new ArrayList<>(toolRegistry.getAllCallbacks());
-    List<ToolCallback> combinedCallbacks = new ArrayList<>(localCallbacks);
+    List<ToolCallback> combinedCallbacks = new ArrayList<>(availableCallbacks);
     combinedCallbacks.addAll(mcpCallbacks);
 
     this.availableCallbacks = combinedCallbacks;

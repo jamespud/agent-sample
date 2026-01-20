@@ -109,17 +109,11 @@ public class ReActAgentController {
     @PathVariable String conversationId,
     @Validated @RequestBody SendMessageRequestDto request
   ) {
-    return Mono.fromCallable(() -> {
-        log.info("Sending message to conversationId={}, content length={}",
-          conversationId, request.getContent() != null ? request.getContent().length() : 0);
-
-        return sessionService.sendMessage(
-          conversationId,
-          request.getContent()
-        );
-      })
-      .subscribeOn(Schedulers.boundedElastic())
-      .flatMap(Mono::fromFuture)
+    log.info("Sending message to conversationId={}, content length={}",
+      conversationId, request.getContent() != null ? request.getContent().length() : 0);
+    
+    // Call service directly (no subscribeOn) - this runs on HTTP thread where @Transactional works
+    return sessionService.sendMessage(conversationId, request.getContent())
       .map(ResponseEntity::ok)
       .onErrorResume(SessionNotFoundException.class, e -> {
         log.warn("Session not found: {}", conversationId);

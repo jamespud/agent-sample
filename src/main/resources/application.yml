@@ -105,7 +105,12 @@ management:
       exposure:
         include: health,info,metrics
 
-logging:
-  level:
-    org.springframework.ai: TRACE
-    com.github.spud.sample.ai: DEBUG
+# ====================== Agent Configuration ======================
+agent:
+  message-history:
+    # Maximum number of historical messages to load per conversation
+    # Prevents loading entire conversation history which can be memory/performance intensive
+    max-messages: 10
+    # Maximum tokens/characters for budget-based trimming (optional, -1 to disable)
+    max-token-budget: -1
+

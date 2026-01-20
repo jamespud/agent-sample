@@ -3,7 +3,6 @@ package com.github.spud.sample.ai.agent.domain.agent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.spud.sample.ai.agent.domain.state.AgentState;
 import com.github.spud.sample.ai.agent.domain.state.ToolChoice;
-import com.github.spud.sample.ai.agent.domain.tools.ToolRegistry;
 import com.github.spud.sample.ai.agent.infrastructure.util.JsonUtils;
 import java.util.ArrayList;
 import java.util.Collections;

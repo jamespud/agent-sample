@@ -1,6 +1,7 @@
 package com.github.spud.sample.ai.agent.domain.message;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
@@ -28,6 +29,9 @@ public class AgentMessage {
   private String toolName;
   
   private String toolArguments;
+
+  // For AssistantMessage: array of tool calls (each call has name, id, arguments)
+  private List<Map<String, Object>> toolCalls;
   
   // Ordering and timestamp
   private Long seq;

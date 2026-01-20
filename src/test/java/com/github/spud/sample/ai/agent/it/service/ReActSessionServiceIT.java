@@ -14,8 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.concurrent.ExecutionException;
-
 /**
  * Service-level integration tests for ReAct Agent (S1-S8 scenarios)
  * Tests Service API layer bypassing HTTP to focus on Agent business logic
@@ -38,7 +36,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S1: Standard completion with answer")
-  void s1_shouldCompleteSuccessfully() throws ExecutionException, InterruptedException {
+  void s1_shouldCompleteSuccessfully() {
     MockResponse response = new OpenAiMockSupport.ResponseBuilder()
       .withContent("Task completed successfully!")
       .withFinishReason("stop")
@@ -58,7 +56,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result = sessionService.sendMessage(conversationId, "Simple task").get();
+    var result = sessionService.sendMessage(conversationId, "Simple task").block();
 
     assertThat(result).isNotNull();
     assertThat(result.getAnswer()).contains("completed successfully");
@@ -67,7 +65,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S2: Multi-step reasoning")
-  void s2_shouldHandleMultipleSteps() throws ExecutionException, InterruptedException {
+  void s2_shouldHandleMultipleSteps() {
     MockResponse step1 = new OpenAiMockSupport.ResponseBuilder()
       .withContent("Analyzing the question...")
       .withFinishReason("stop")
@@ -94,7 +92,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result = sessionService.sendMessage(conversationId, "Complex question").get();
+    var result = sessionService.sendMessage(conversationId, "Complex question").block();
 
     assertThat(result).isNotNull();
     assertThat(result.isFinished()).isTrue();
@@ -102,7 +100,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S3: Reaches maxSteps limit")
-  void s3_shouldStopAtMaxSteps() throws ExecutionException, InterruptedException {
+  void s3_shouldStopAtMaxSteps() {
     for (int i = 1; i <= 5; i++) {
       MockResponse step = new OpenAiMockSupport.ResponseBuilder()
         .withContent("Step " + i + " processing...")
@@ -124,7 +122,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result = sessionService.sendMessage(conversationId, "Long task").get();
+    var result = sessionService.sendMessage(conversationId, "Long task").block();
 
     assertThat(result).isNotNull();
     assertThat(result.isFinished()).isTrue();
@@ -132,7 +130,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S4: Empty response handling")
-  void s4_shouldHandleEmptyResponse() throws ExecutionException, InterruptedException {
+  void s4_shouldHandleEmptyResponse() {
     MockResponse response = new OpenAiMockSupport.ResponseBuilder()
       .withContent("")
       .withFinishReason("stop")
@@ -152,7 +150,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result = sessionService.sendMessage(conversationId, "Empty test").get();
+    var result = sessionService.sendMessage(conversationId, "Empty test").block();
 
     assertThat(result).isNotNull();
     assertThat(result.isFinished()).isTrue();
@@ -160,7 +158,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S5: Long response content")
-  void s5_shouldHandleLongContent() throws ExecutionException, InterruptedException {
+  void s5_shouldHandleLongContent() {
     String longContent = "Answer: " + "A".repeat(500) + ". End.";
     MockResponse response = new OpenAiMockSupport.ResponseBuilder()
       .withContent(longContent)
@@ -181,7 +179,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result = sessionService.sendMessage(conversationId, "Give details").get();
+    var result = sessionService.sendMessage(conversationId, "Give details").block();
 
     assertThat(result).isNotNull();
     assertThat(result.getAnswer()).contains("Answer:");
@@ -191,7 +189,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S6: Session continuity across messages")
-  void s6_shouldMaintainContext() throws ExecutionException, InterruptedException {
+  void s6_shouldMaintainContext() {
     MockResponse resp1 = new OpenAiMockSupport.ResponseBuilder()
       .withContent("Hello! Ready to help.")
       .withFinishReason("stop")
@@ -211,7 +209,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result1 = sessionService.sendMessage(conversationId, "Hi").get();
+    var result1 = sessionService.sendMessage(conversationId, "Hi").block();
 
     assertThat(result1.getAnswer()).contains("Hello");
 
@@ -221,14 +219,14 @@ class ReActSessionServiceIT extends ContainersSupport {
       .build();
     OpenAiMockSupport.enqueueResponse(resp2);
 
-    var result2 = sessionService.sendMessage(conversationId, "Remember?").get();
+    var result2 = sessionService.sendMessage(conversationId, "Remember?").block();
 
     assertThat(result2.getAnswer()).contains("remember");
   }
 
   @Test
   @DisplayName("S7: TOOLCALL agent type")
-  void s7_shouldCreateToolCallAgent() throws ExecutionException, InterruptedException {
+  void s7_shouldCreateToolCallAgent() {
     MockResponse response = new OpenAiMockSupport.ResponseBuilder()
       .withContent("TOOLCALL agent ready.")
       .withFinishReason("stop")
@@ -248,7 +246,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     request.setAgentId(agentId);
 
     String conversationId = sessionService.createSession(request);
-    var result = sessionService.sendMessage(conversationId, "Test").get();
+    var result = sessionService.sendMessage(conversationId, "Test").block();
 
     assertThat(result).isNotNull();
     assertThat(result.getAnswer()).isNotEmpty();
@@ -256,7 +254,7 @@ class ReActSessionServiceIT extends ContainersSupport {
 
   @Test
   @DisplayName("S8: Multiple independent sessions")
-  void s8_shouldIsolateSessions() throws ExecutionException, InterruptedException {
+  void s8_shouldIsolateSessions() {
     // First session
     MockResponse respA = new OpenAiMockSupport.ResponseBuilder()
       .withContent("Response for Session A")
@@ -277,7 +275,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     req1.setAgentId(agentId1);
 
     String convId1 = sessionService.createSession(req1);
-    var result1 = sessionService.sendMessage(convId1, "Msg to A").get();
+    var result1 = sessionService.sendMessage(convId1, "Msg to A").block();
 
     assertThat(result1.getAnswer()).contains("Session A");
 
@@ -300,7 +298,7 @@ class ReActSessionServiceIT extends ContainersSupport {
     req2.setAgentId(agentId2);
 
     String convId2 = sessionService.createSession(req2);
-    var result2 = sessionService.sendMessage(convId2, "Msg to B").get();
+    var result2 = sessionService.sendMessage(convId2, "Msg to B").block();
 
     // Verify sessions are isolated
     assertThat(convId1).isNotEqualTo(convId2);

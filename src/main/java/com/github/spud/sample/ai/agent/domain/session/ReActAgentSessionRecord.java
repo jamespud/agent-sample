@@ -26,7 +26,7 @@ public class ReActAgentSessionRecord {
   private String toolChoice;
   private ReActSessionStatus status;
   private Integer version;
-  private java.util.List<String> enabledToolNames;
+  private java.util.List<String> enabledToolsSnapshot;
 
   public ReActAgentSession toEntity() {
     ReActAgentSession entity = new ReActAgentSession();
@@ -41,7 +41,7 @@ public class ReActAgentSessionRecord {
     entity.setToolChoice(this.toolChoice);
     entity.setStatus(this.status);
     entity.setVersion(this.version);
-    entity.setEnabledToolNames(this.enabledToolNames);
+    entity.setEnabledToolsSnapshot(this.enabledToolsSnapshot);
     return entity;
   }
 }

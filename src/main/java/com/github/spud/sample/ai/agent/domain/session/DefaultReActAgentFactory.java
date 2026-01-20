@@ -37,13 +37,14 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
 
     ToolChoice toolChoice = ToolChoice.valueOf(session.getToolChoice());
 
+    // Use enabled tools snapshot (immutable copy taken at session creation)
+    List<ToolCallback> callbacks = new java.util.ArrayList<>();
+    if (session.getEnabledToolsSnapshot() != null) {
+      session.getEnabledToolsSnapshot().forEach(name -> toolRegistry.getCallback(name).ifPresent(callbacks::add));
+    }
     switch (session.getAgentType()) {
       case TOOLCALL:
         // ToolAgent only uses local tools from ToolRegistry
-        java.util.List<ToolCallback> callbacks = new java.util.ArrayList<>();
-        if (session.getEnabledToolNames() != null) {
-          session.getEnabledToolNames().forEach(name -> toolRegistry.getCallback(name).ifPresent(callbacks::add));
-        }
 
         ToolCallAgent toolAgent = ToolCallAgent.builder()
           .name("react-tool_call-" + session.getConversationId())
@@ -74,8 +75,8 @@ public class DefaultReActAgentFactory implements ReActAgentFactory {
           .messages(historyMessages)
           .maxSteps(session.getMaxSteps())
           .duplicateThreshold(session.getDuplicateThreshold())
-          .toolRegistry(toolRegistry)
           .mcpClientManager(mcpClientManager)
+          .availableCallbacks(callbacks)
           .build();
 
         // Initialize MCP with enabled servers (builds and injects MCP callbacks)

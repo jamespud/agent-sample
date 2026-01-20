@@ -1,22 +1,25 @@
 package com.github.spud.sample.ai.agent.infrastructure.persistence.entity;
 
 import com.github.spud.sample.ai.agent.domain.session.ReActAgentType;
+import com.github.spud.sample.ai.agent.domain.session.ReActAgentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Agent configuration entity for agent lifecycle management
@@ -32,6 +35,10 @@ public class ReActAgentConfig {
   @Size(max = 36)
   @Column(name = "agent_id", nullable = false, length = 36)
   private String agentId;
+
+  @Version
+  @Column(name = "version")
+  private Long version;
 
   @NotNull
   @Column(name = "name", nullable = false, length = 100)
@@ -76,10 +83,12 @@ public class ReActAgentConfig {
   @NotNull
   @ColumnDefault("'ACTIVE'")
   @Column(name = "status", nullable = false, length = 20)
-  private String status = "ACTIVE";
+  @Enumerated(EnumType.STRING)
+  private ReActAgentStatus status = ReActAgentStatus.ACTIVE;
 
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "enabled_tools", columnDefinition = "jsonb")
-  private String enabledTools;
+  private List<String> enabledTools;
 
   @ColumnDefault("now()")
   @CreationTimestamp

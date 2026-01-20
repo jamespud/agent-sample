@@ -11,7 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
@@ -20,10 +19,11 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.springframework.ai.tool.ToolCallback;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Setter
@@ -81,8 +81,9 @@ public class ReActAgentSession {
   @JoinColumn(name = "conversation_id", referencedColumnName = "conversation_id")
   private List<ReActAgentMessage> messages;
 
-  @Transient
-  private List<String> enabledToolNames;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "enabled_tools_snapshot", columnDefinition = "jsonb")
+  private List<String> enabledToolsSnapshot;
 
   @NotNull
   @ColumnDefault("0")

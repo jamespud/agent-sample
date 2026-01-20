@@ -31,6 +31,7 @@ public class AgentMessageMapper {
     entity.setToolCallId(domain.getToolCallId());
     entity.setToolName(domain.getToolName());
     entity.setToolArguments(domain.getToolArguments());
+    entity.setToolCalls(domain.getToolCalls() != null ? new ArrayList<>(domain.getToolCalls()) : null);
     entity.setSeq(domain.getSeq());
     return entity;
   }
@@ -46,6 +47,7 @@ public class AgentMessageMapper {
       .toolCallId(entity.getToolCallId())
       .toolName(entity.getToolName())
       .toolArguments(entity.getToolArguments())
+      .toolCalls(entity.getToolCalls() != null ? new ArrayList<>(entity.getToolCalls()) : null)
       .seq(entity.getSeq())
       .build();
   }
@@ -121,8 +123,19 @@ public class AgentMessageMapper {
 
     // Extract tool-related fields if present
     if (springMessage instanceof AssistantMessage assistantMsg) {
-      // Tool calls are handled separately in agent execution
-      // Here we just capture the text content
+      // Capture tool calls from AssistantMessage
+      List<AssistantMessage.ToolCall> toolCalls = assistantMsg.getToolCalls();
+      if (toolCalls != null && !toolCalls.isEmpty()) {
+        List<Map<String, Object>> toolCallsList = new ArrayList<>();
+        for (AssistantMessage.ToolCall tc : toolCalls) {
+          Map<String, Object> tcMap = new HashMap<>();
+          tcMap.put("id", tc.id());
+          tcMap.put("name", tc.name());
+          tcMap.put("arguments", tc.arguments());
+          toolCallsList.add(tcMap);
+        }
+        builder.toolCalls(toolCallsList);
+      }
     } else if (springMessage instanceof ToolResponseMessage toolMsg) {
       // Extract tool response details
       if (!toolMsg.getResponses().isEmpty()) {
